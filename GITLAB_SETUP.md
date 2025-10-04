@@ -46,7 +46,7 @@ git commit -m "Initial commit: Digimidi Query Builder with Docker CI/CD"
 ### 2.2 Connect to GitLab
 ```bash
 # Add GitLab remote (replace with your actual URL)
-git remote add origin https://gitlab.com/your-username/digimidi-query-builder.git
+git remote add origin https://gitlab.com/digimidi-query-builder/digimidi-query-builder.git
 
 # Push to GitLab
 git push -u origin main
