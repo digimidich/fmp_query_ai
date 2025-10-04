@@ -132,8 +132,9 @@
       if (!any) return [];
       if (Array.isArray(any)) return any;
 
-      // Cas OData : { value: [ { resultParameter: "..." } ] }
+      // Cas objet : on teste d'abord les schémas connus puis on explore récursivement toutes les clés
       if (typeof any === 'object') {
+        // 1) OData : { value: [ { resultParameter: "..." } ] }
         if (Array.isArray(any.value) && any.value.length) {
           const v0 = any.value[0];
           const fromValue = (v0 && (v0.resultParameter ?? v0.ResultParameter ?? v0)) ?? null;
@@ -141,9 +142,28 @@
           if (arrFromValue.length) return arrFromValue;
         }
 
-        // Cas général : resultParameter à la racine
-        const cand = any.resultParameter ?? any.ResultParameter ?? any.result ?? any.data ?? any.raw ?? null;
-        if (cand) return extractArrayFromAny(cand);
+        // 2) FileMaker ScriptResult : { scriptResult: { resultParameter: "..." } }
+        if (any.scriptResult) {
+          const cand = any.scriptResult.resultParameter ?? any.scriptResult.ResultParameter ?? null;
+          if (cand) {
+            const got = extractArrayFromAny(cand);
+            if (got.length) return got;
+          }
+        }
+
+        // 3) Cas général : resultParameter à la racine
+        const directCand = any.resultParameter ?? any.ResultParameter ?? any.result ?? any.data ?? any.raw ?? null;
+        if (directCand) {
+          const got = extractArrayFromAny(directCand);
+          if (got.length) return got;
+        }
+
+        // 4) Exploration récursive de toutes les valeurs de l'objet (pour attraper des clés inattendues)
+        for (const v of Object.values(any)) {
+          const got = extractArrayFromAny(v);
+          if (got.length) return got;
+        }
+        return [];
       }
 
       // Cas string
@@ -186,14 +206,16 @@ ${head}
     }
 
     function normalizeRow(r){
+      const steriliseeRaw = r['sterilisée'] ?? r['stérilisée'] ?? r.sterilisee ?? r.sterilisee ?? r.sterilized ?? '';
+      const dateN = r['date naissance'] ?? r.date_naissance ?? r.dateNaissance ?? r.birth_date ?? '';
       return {
-        nom: r.nom ?? '',
-        espece: r.espece ?? '',
-        race: r.race ?? '',
+        nom: r.nom ?? r.name ?? '',
+        espece: r.espece ?? r.espèce ?? r.species ?? '',
+        race: r.race ?? r.breed ?? '',
         poids: (r.poids === '' || r.poids == null) ? null : Number(r.poids),
-        sterilisee: (r['sterilisée'] ?? r.sterilisee ?? '').toString().trim().toUpperCase(),
-        date_naissance: r['date naissance'] ?? r.date_naissance ?? '',
-        id: r.id ?? ''
+        sterilisee: String(steriliseeRaw ?? '').trim().toUpperCase(),
+        date_naissance: dateN,
+        id: r.id ?? r.ID ?? r.Id ?? ''
       };
     }
 
