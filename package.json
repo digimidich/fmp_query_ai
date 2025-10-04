@@ -1,13 +1,12 @@
 {
-  "name": "digimidi-query-builder",
+  "name": "fmp_query_ai",
   "version": "1.0.0",
-  "type": "module",
   "scripts": { "start": "node server.js" },
   "engines": { "node": ">=18" },
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.21.2",
-    "node-fetch": "^2.7.0",
-    "body-parser": "^1.20.3"
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.3",
+    "node-fetch": "2.7.0"
   }
 }
