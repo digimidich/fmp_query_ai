@@ -72,6 +72,7 @@
     <section class="card">
       <div id="status" class="muted">Prêt.</div>
       <div id="messages"></div>
+      <div id="debug" class="muted" style="white-space:pre-wrap; margin-top:8px;"></div>
 
       <div class="toolbar">
         <input id="globalSearch" class="search" placeholder="🔎 Recherche globale (nom, race, espèce…)" />
@@ -101,6 +102,7 @@
     const countEl = document.getElementById('count');
     const globalSearch = document.getElementById('globalSearch');
     const filterInputs = Array.from(document.querySelectorAll('.filter'));
+    const debugEl = document.getElementById('debug');
 
     let rawRows = [];
     let viewRows = [];
@@ -125,32 +127,26 @@
     function showError(msg){ showMsg(msg, 'err'); }
     function escapeHtml(str){ return (str??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-    function normalizeRow(r){
-      return {
-        nom: r.nom ?? '',
-        espece: r.espece ?? '',
-        race: r.race ?? '',
-        poids: (r.poids === '' || r.poids == null) ? null : Number(r.poids),
-        sterilisee: (r['sterilisée'] ?? r.sterilisee ?? '').toString().trim().toUpperCase(),
-        date_naissance: r['date naissance'] ?? r.date_naissance ?? '',
-        id: r.id ?? ''
-      };
-    }
-
     // récupère un array JSON où qu’il se cache (objet, string, texte brut)
     function extractArrayFromAny(any) {
       if (!any) return [];
       if (Array.isArray(any)) return any;
 
-      // cas 1 : objet avec resultParameter
+      // Cas OData : { value: [ { resultParameter: "..." } ] }
       if (typeof any === 'object') {
-        const cand = any.resultParameter ?? any.ResultParameter ?? any.result ?? any.data ?? null;
+        if (Array.isArray(any.value) && any.value.length) {
+          const v0 = any.value[0];
+          const fromValue = (v0 && (v0.resultParameter ?? v0.ResultParameter ?? v0)) ?? null;
+          const arrFromValue = extractArrayFromAny(fromValue);
+          if (arrFromValue.length) return arrFromValue;
+        }
+
+        // Cas général : resultParameter à la racine
+        const cand = any.resultParameter ?? any.ResultParameter ?? any.result ?? any.data ?? any.raw ?? null;
         if (cand) return extractArrayFromAny(cand);
-        // parfois la réponse est une string JSON complète
-        if (any.raw) return extractArrayFromAny(any.raw);
       }
 
-      // cas 2 : string
+      // Cas string
       if (typeof any === 'string') {
         // si la string elle-même est un JSON valide
         try {
@@ -166,8 +162,39 @@
           try { return JSON.parse(slice); } catch(_) {}
         }
       }
-
       return [];
+    }
+
+    // Affiche un aperçu brut de la réponse et le premier id détecté
+    function showDebugRaw(rawText, payload) {
+      const head = rawText.slice(0, 600);
+      let firstId = '(aucun)';
+      try {
+        const arr = extractArrayFromAny(payload);
+        if (Array.isArray(arr) && arr.length) {
+          const first = arr[0];
+          firstId = (first && (first.id ?? first.ID ?? first.Id)) ?? '(pas de clé id)';
+        }
+      } catch (_) {}
+      debugEl.textContent =
+`[DEBUG] Aperçu réponse brute (600 chars):
+${head}
+
+[DEBUG] typeof payload: ${typeof payload}
+[DEBUG] clés payload: ${payload && typeof payload === 'object' ? Object.keys(payload).join(', ') : '(n/a)'}
+[DEBUG] Premier id détecté: ${firstId}`;
+    }
+
+    function normalizeRow(r){
+      return {
+        nom: r.nom ?? '',
+        espece: r.espece ?? '',
+        race: r.race ?? '',
+        poids: (r.poids === '' || r.poids == null) ? null : Number(r.poids),
+        sterilisee: (r['sterilisée'] ?? r.sterilisee ?? '').toString().trim().toUpperCase(),
+        date_naissance: r['date naissance'] ?? r.date_naissance ?? '',
+        id: r.id ?? ''
+      };
     }
 
     function renderTable(rows){
@@ -281,6 +308,7 @@
       const query = q.value.trim();
       messagesEl.innerHTML = '';
       tableWrap.innerHTML = '';
+      debugEl.textContent = '';
       if (!query) return showError('Merci de saisir une requête.');
 
       try {
@@ -297,6 +325,9 @@
         let payload;
         try { payload = JSON.parse(rawText); } catch { payload = { raw: rawText }; }
 
+        // Affiche un aperçu de la réponse brute et tente d'extraire un id
+        showDebugRaw(rawText, payload);
+
         if (!resp.ok) {
           showError(`Erreur ${resp.status} : ${rawText.slice(0, 300)}…`);
           return;
@@ -306,6 +337,11 @@
         const arr = extractArrayFromAny(payload);
         rawRows = Array.isArray(arr) ? arr.map(normalizeRow) : [];
         viewRows = [...rawRows];
+
+        if (!viewRows.length) {
+          showMsg('Réponse reçue mais aucune ligne parsée. Vérifie le schéma (resultParameter / OData value).', 'err');
+          return;
+        }
 
         showMsg('Réponse reçue ✔︎', 'ok');
         applySort();
