@@ -4,23 +4,38 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import path from "path";
 import { fileURLToPath } from "url";
-import fetch from "node-fetch"; // v2 OK en ESM quand "type":"module" est défini
+import fetch from "node-fetch"; // v2 OK avec "type":"module"
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// --- Config vars (définies dans Koyeb) ---
+/* ========= Config via variables d'environnement (Koyeb) ========= */
 const PORT = process.env.PORT || 3000;
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+
 const FM_SCRIPT_URL =
   process.env.FM_SCRIPT_URL ||
   "https://digimidi.fmcloud.fm/fmi/odata/v4/DIGIMIDI_DEV/Script.search_pet_n8n";
-const FM_AUTH_B64 = process.env.FM_AUTH_B64; // Base64("user:pass")
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY; // utilisée côté serveur uniquement
 
-// --- Middlewares ---
+// Utilise maintenant FM_USER/FM_PASS plutôt que FM_AUTH_B64
+const FM_USER = process.env.FM_USER;
+const FM_PASS = process.env.FM_PASS;
+
+// Clé OpenAI côté serveur uniquement (si tu en as besoin plus tard)
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+
+/* ========= Helpers ========= */
+function fmBasicAuth() {
+  if (!FM_USER || !FM_PASS) {
+    throw new Error("FM_USER or FM_PASS missing");
+  }
+  const b64 = Buffer.from(`${FM_USER}:${FM_PASS}`, "utf8").toString("base64");
+  return `Basic ${b64}`;
+}
+
+/* ========= Middlewares ========= */
 app.use(
   cors({
     origin: ALLOWED_ORIGIN,
@@ -31,43 +46,50 @@ app.use(
 );
 app.use(bodyParser.json());
 
-// --- Servir le front (index.html à la racine du repo) ---
+/* ========= Frontend (sert index.html à /) ========= */
 app.use(express.static(__dirname));
 app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// --- Healthcheck ---
+/* ========= Healthcheck ========= */
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// --- Proxy FileMaker ---
+/* ========= Proxy FileMaker =========
+   Le front envoie { scriptParameterValue: "..." } à /api/filemaker.
+   Le serveur appelle ensuite FileMaker (OData Script) en Basic Auth.
+==================================================== */
 app.post("/api/filemaker", async (req, res) => {
   try {
-    if (!FM_AUTH_B64) {
-      return res.status(500).json({ error: "FM_AUTH_B64 not set" });
-    }
-    // Le front envoie { scriptParameterValue: "..." }
-    const payload = req.body;
-
+    const payload = req.body ?? {};
     const fmResp = await fetch(FM_SCRIPT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${FM_AUTH_B64}`,
+        Authorization: fmBasicAuth(),
       },
       body: JSON.stringify(payload),
     });
 
     const contentType = fmResp.headers.get("content-type") || "application/json";
     const bodyText = await fmResp.text();
+
+    // Forward du status + du body
     res.status(fmResp.status).type(contentType).send(bodyText);
   } catch (e) {
-    res.status(502).json({ error: "Upstream error", detail: e.message });
+    // 401/212 → mauvais identifiants, autres → erreur upstream
+    res
+      .status(502)
+      .json({ error: "Upstream error", detail: e?.message || String(e) });
   }
 });
 
-// (Optionnel) Exemple d’endpoint utilisant OpenAI côté serveur uniquement
-// app.post("/api/ai", async (req, res) => { ... });
+/* ========= (Optionnel) Endpoint AI côté serveur uniquement =========
+app.post("/api/ai", async (req, res) => {
+  if (!OPENAI_API_KEY) return res.status(500).json({ error: "OPENAI_API_KEY not set" });
+  // ... appel OpenAI ici ...
+});
+==================================================================== */
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Listening on ${PORT}`);
