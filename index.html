@@ -236,7 +236,7 @@ ${head}
         return `<th data-key="${h.key}" class="${cls}">${h.label}${dir}</th>`;
       }).join('');
 
-      const trs = rows.map(r => `
+      let trs = rows.map(r => `
         <tr>
           <td>${escapeHtml(r.nom)}</td>
           <td class="col-espece">${escapeHtml(r.espece)}</td>
@@ -247,6 +247,9 @@ ${head}
           <td class="col-id">${escapeHtml(r.id)}</td>
         </tr>
       `).join('');
+      if (!trs) {
+        trs = `<tr><td colspan="7" class="muted" style="text-align:center;padding:16px;">Aucune donnée</td></tr>`;
+      }
 
       tableWrap.innerHTML = `
         <table>
@@ -326,6 +329,29 @@ ${head}
       renderTable(viewRows);
     }
 
+    // parse spécifiquement scriptResult.resultParameter (souvent une string JSON avec \r etc.)
+    function parseResultParam(str) {
+      if (str == null) return [];
+      if (Array.isArray(str)) return str;
+      if (typeof str !== 'string') return extractArrayFromAny(str);
+      // 1) tentative JSON.parse directe
+      try { 
+        const v = JSON.parse(str);
+        return Array.isArray(v) ? v : extractArrayFromAny(v);
+      } catch(_) {}
+      // 2) isole la première séquence [ ... ] et parse
+      const start = str.indexOf('[');
+      const end = str.lastIndexOf(']');
+      if (start !== -1 && end !== -1 && end > start) {
+        const slice = str.slice(start, end + 1);
+        try {
+          const v = JSON.parse(slice);
+          return Array.isArray(v) ? v : extractArrayFromAny(v);
+        } catch(_) {}
+      }
+      return [];
+    }
+
     async function processQuery() {
       const query = q.value.trim();
       messagesEl.innerHTML = '';
@@ -350,22 +376,36 @@ ${head}
         // Affiche un aperçu de la réponse brute et tente d'extraire un id
         showDebugRaw(rawText, payload);
 
+        // Fast-path pour FileMaker: parse directement scriptResult.resultParameter si présent
+        let fastRows = [];
+        if (payload && payload.scriptResult && (payload.scriptResult.resultParameter || payload.scriptResult.ResultParameter)) {
+          const rp = payload.scriptResult.resultParameter ?? payload.scriptResult.ResultParameter;
+          fastRows = parseResultParam(rp);
+        }
+
         if (!resp.ok) {
           showError(`Erreur ${resp.status} : ${rawText.slice(0, 300)}…`);
           return;
         }
 
-        // -> extraction ultra tolérante
-        const arr = extractArrayFromAny(payload);
+        // -> extraction robuste (préfère le fast-path)
+        let arr = [];
+        if (Array.isArray(fastRows) && fastRows.length) {
+          arr = fastRows;
+        } else {
+          arr = extractArrayFromAny(payload);
+        }
         rawRows = Array.isArray(arr) ? arr.map(normalizeRow) : [];
         viewRows = [...rawRows];
 
         if (!viewRows.length) {
           showMsg('Réponse reçue mais aucune ligne parsée. Vérifie le schéma (resultParameter / OData value).', 'err');
+          applySort();
+          renderTable(viewRows); // affiche quand même l’en-tête et la ligne “Aucune donnée”
           return;
         }
 
-        showMsg('Réponse reçue ✔︎', 'ok');
+        showMsg(`Réponse reçue ✔︎ (${viewRows.length} lignes)`, 'ok');
         applySort();
         renderTable(viewRows);
       } catch (err) {
