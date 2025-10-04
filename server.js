@@ -5,7 +5,6 @@ import bodyParser from "body-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch"; // v2 OK avec "type":"module"
-import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,7 +27,17 @@ const FM_PASS = process.env.FM_PASS;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 /* ========= OpenAI (optionnel, réintégré) ========= */
-const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
+// Import dynamique : si le package 'openai' n'est pas installé, l'app continue sans IA.
+let openai = null;
+if (OPENAI_API_KEY) {
+  try {
+    const mod = await import('openai');
+    const OpenAI = mod.default ?? mod.OpenAI ?? mod;
+    openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+  } catch (e) {
+    console.warn('[startup] Package "openai" introuvable. Démarrage sans IA. Détail:', e?.message || e);
+  }
+}
 
 const systemPrompt = `
 Tu es un générateur de requêtes FileMaker. 
