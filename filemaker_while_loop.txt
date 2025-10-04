@@ -1,0 +1,87 @@
+# FileMaker While Loop Examples
+
+## Basic While Loop Structure
+
+```
+# Initialize counter
+Set Variable [ $counter ; Value: 1 ]
+
+# While loop with condition
+While [ $counter ≤ 10 ]
+    # Loop body - do something here
+    Show Custom Dialog [ "Iteration: " & $counter ]
+    
+    # Increment counter (IMPORTANT: prevents infinite loop)
+    Set Variable [ $counter ; Value: $counter + 1 ]
+End While
+```
+
+## Practical Example: Process Records
+
+```
+# Initialize variables
+Set Variable [ $recordCount ; Value: Get ( FoundCount ) ]
+Set Variable [ $currentRecord ; Value: 1 ]
+
+# While loop to process each record
+While [ $currentRecord ≤ $recordCount ]
+    # Go to the current record
+    Go to Record/Request/Page [ $currentRecord ]
+    
+    # Do something with the current record
+    # For example: update a field
+    Set Field [ Table::ProcessedField ; "Processed on " & Get ( CurrentTime ) ]
+    
+    # Move to next record
+    Set Variable [ $currentRecord ; Value: $currentRecord + 1 ]
+End While
+```
+
+## Example: Search and Replace in Loop
+
+```
+# Initialize variables
+Set Variable [ $searchText ; Value: "old text" ]
+Set Variable [ $replaceText ; Value: "new text" ]
+Set Variable [ $currentRecord ; Value: 1 ]
+Set Variable [ $totalRecords ; Value: Get ( FoundCount ) ]
+
+# While loop for search and replace
+While [ $currentRecord ≤ $totalRecords ]
+    # Go to current record
+    Go to Record/Request/Page [ $currentRecord ]
+    
+    # Check if field contains search text
+    If [ PatternCount ( Table::TextField ; $searchText ) > 0 ]
+        # Replace the text
+        Set Field [ Table::TextField ; Substitute ( Table::TextField ; $searchText ; $replaceText ) ]
+    End If
+    
+    # Move to next record
+    Set Variable [ $currentRecord ; Value: $currentRecord + 1 ]
+End While
+```
+
+## Important Notes:
+
+1. **Always initialize your counter variable** before the loop
+2. **Always increment your counter** inside the loop to prevent infinite loops
+3. **Use meaningful variable names** for clarity
+4. **Test your condition carefully** to ensure the loop will terminate
+5. **Consider using Exit Loop If** for early termination if needed
+
+## Early Exit Example:
+
+```
+Set Variable [ $counter ; Value: 1 ]
+
+While [ $counter ≤ 100 ]
+    # Do some processing
+    Set Field [ Table::Status ; "Processing..." ]
+    
+    # Exit early if condition is met
+    Exit Loop If [ Table::Status = "Complete" ]
+    
+    Set Variable [ $counter ; Value: $counter + 1 ]
+End While
+```

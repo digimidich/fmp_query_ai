@@ -1,0 +1,78 @@
+# GitLab CI/CD Pipeline for Digimidi Query Builder
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE
+  DOCKER_IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+
+# Build Docker image
+build:
+  stage: build
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - echo "Building Docker image..."
+    - docker build -t $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG .
+    - docker build -t $DOCKER_IMAGE_NAME:latest .
+    - echo "Pushing Docker image to registry..."
+    - docker push $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG
+    - docker push $DOCKER_IMAGE_NAME:latest
+  only:
+    - main
+    - develop
+
+# Test the application
+test:
+  stage: test
+  image: node:18-alpine
+  before_script:
+    - npm install
+  script:
+    - echo "Running tests..."
+    - node -c server.js
+    - echo "Health check test..."
+    - node -e "console.log('Node.js syntax check passed')"
+  only:
+    - main
+    - develop
+    - merge_requests
+
+# Deploy to Koyeb (manual trigger)
+deploy_koyeb:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl
+    - curl -L https://github.com/koyeb/koyeb-cli/releases/latest/download/koyeb-cli_linux_amd64.tar.gz | tar -xz
+    - chmod +x koyeb
+    - ./koyeb auth login --token $KOYEB_TOKEN
+  script:
+    - echo "Deploying to Koyeb..."
+    - ./koyeb service update $KOYEB_SERVICE_ID --image $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG
+    - echo "Deployment completed successfully!"
+  when: manual
+  only:
+    - main
+  environment:
+    name: production
+    url: https://$KOYEB_APP_NAME.koyeb.app
+
+# Security scan
+security_scan:
+  stage: test
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  script:
+    - echo "Running security scan..."
+    - docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG
+  allow_failure: true
+  only:
+    - main
+    - develop

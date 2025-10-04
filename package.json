@@ -1,0 +1,24 @@
+{
+  "name": "digimidi-query-builder",
+  "version": "1.0.0",
+  "description": "Digimidi Query AI Builder - FileMaker Script API Query Builder with AI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "filemaker",
+    "ai",
+    "query",
+    "digimidi"
+  ],
+  "author": "Digimidi",
+  "license": "MIT"
+}

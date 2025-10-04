@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digimidi Query Builder with AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #2c3e50;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #666;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .debug-console {
+            background: #000;
+            border: 2px solid #0f0;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 25px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .debug-console h3 {
+            color: #0f0;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        #consoleOutput {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            color: #0f0;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .console-entry {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+
+        .console-error {
+            color: #ff4444;
+        }
+
+        .console-success {
+            color: #44ff44;
+        }
+
+        .console-info {
+            color: #4444ff;
+        }
+
+        .console-warn {
+            color: #ffaa00;
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .config-section h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            padding: 10px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #333;
+            box-shadow: 0 0 0 2px rgba(51, 51, 51, 0.1);
+        }
+
+        .query-section {
+            margin-bottom: 25px;
+        }
+
+        .query-input-wrapper {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .query-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: #333;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .btn-primary:hover {
+            background: #555;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            padding: 8px 15px;
+            font-size: 0.9rem;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #333;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .info-box h4 {
+            color: #495057;
+            margin-bottom: 10px;
+        }
+
+        .info-box code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #333;
+            font-family: 'Courier New', monospace;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #333;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .code-block {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #f5c6cb;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #c3e6cb;
+        }
+
+        .debug-box {
+            background: #2d2d2d;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            overflow-x: auto;
+            border: 1px solid #00ff00;
+        }
+
+        .debug-box h5 {
+            color: #00ff00;
+            margin-bottom: 10px;
+        }
+
+        .debug-box pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .data-table {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        .data-table table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            color: #333;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            transition: background-color 0.2s ease;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .data-table th:hover {
+            background: #e9ecef;
+        }
+
+        .data-table th.sortable::after {
+            content: ' ↕';
+            opacity: 0.7;
+            font-size: 0.8em;
+        }
+
+        .data-table th.sort-asc::after {
+            content: ' ↑';
+            opacity: 1;
+            color: #333;
+        }
+
+        .data-table th.sort-desc::after {
+            content: ' ↓';
+            opacity: 1;
+            color: #333;
+        }
+
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #333;
+            box-shadow: 0 0 0 2px rgba(51, 51, 51, 0.1);
+        }
+
+        .reset-sort-btn {
+            padding: 8px 16px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .reset-sort-btn:hover {
+            background: #5a6268;
+        }
+
+        .table-info {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .settings-btn {
+            margin-top: 15px;
+            background: #333;
+            border: 2px solid #333;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .settings-btn:hover {
+            background: #555;
+            border-color: #555;
+            transform: translateY(-1px);
+        }
+
+        .log-section {
+            transition: all 0.3s ease;
+        }
+
+        .log-section.hidden {
+            display: none;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .config-section {
+            transition: all 0.3s ease;
+        }
+
+        .config-section.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Digimidi Query AI Builder</h1>
+            <p>Use natural language to search FileMaker</p>
+            <div class="header-buttons">
+                <button id="settingsBtn" class="btn btn-secondary settings-btn" onclick="toggleLogs()">
+                    <span id="settingsText">Hide Logs</span>
+                </button>
+                <button id="configBtn" class="btn btn-secondary settings-btn" onclick="toggleConfig()">
+                    <span id="configText">Hide Config</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="main-card">
+            <!-- Debug Console -->
+            <div class="debug-console log-section" id="debugConsole">
+                <h3>🖥️ Debug Console</h3>
+                <div id="consoleOutput">
+                    <div class="console-entry console-info">Console initialized. Ready for debugging...</div>
+                </div>
+                <button class="btn btn-secondary" onclick="clearConsole()">Clear Console</button>
+            </div>
+
+            <!-- Configuration Section -->
+            <div class="config-section" id="openaiConfig">
+                <h3>⚙️ OpenAI Configuration</h3>
+                <div class="config-grid">
+                    <div class="form-group">
+                        <label for="openaiKey">OpenAI API Key</label>
+                        <input type="password" id="openaiKey" placeholder="sk-..." />
+                    </div>
+                    <div class="form-group">
+                        <label for="openaiModel">AI Model</label>
+                        <select id="openaiModel">
+                            <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+                            <option value="gpt-4o">GPT-4o (Better)</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FileMaker Configuration -->
+            <div class="config-section" id="filemakerConfig">
+                <h3>🗄️ FileMaker Script Configuration</h3>
+                <div class="config-grid">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label for="fmScriptUrl">Script URL</label>
+                        <input type="text" id="fmScriptUrl" 
+                               value="https://digimidi.fmcloud.fm/fmi/odata/v4/DIGIMIDI_DEV/Script.search_pet_n8n" 
+                               placeholder="https://server/fmi/odata/v4/database/Script.scriptname" />
+                    </div>
+                    <div class="form-group">
+                        <label for="fmUsername">Username</label>
+                        <input type="text" id="fmUsername" placeholder="Username" />
+                    </div>
+                    <div class="form-group">
+                        <label for="fmPassword">Password</label>
+                        <input type="password" id="fmPassword" placeholder="Password" />
+                    </div>
+                    <div class="form-group">
+                        <label for="fmAuthBasic">Or Base64 Auth String (optional)</label>
+                        <input type="text" id="fmAuthBasic" placeholder="YW50b2luZToxMjMh" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="info-box config-section" id="infoBox">
+                <h4>📋 How This Works</h4>
+                <ul style="list-style: none; padding-left: 10px;">
+                    <li style="padding: 5px 0;">1. OpenAI extracts keywords from your natural language query</li>
+                    <li style="padding: 5px 0;">2. Keywords are sent to FileMaker Script via <code>scriptParameterValue</code></li>
+                    <li style="padding: 5px 0;">3. FileMaker script returns search results as JSON</li>
+                    <li style="padding: 5px 0;">4. Results are parsed with jq expression: <code>.scriptResult.resultParameter | split("\\r")[0] | fromjson</code></li>
+                </ul>
+            </div>
+
+            <!-- Query Section -->
+            <div class="query-section">
+                <h3>🔍 Natural Language Query</h3>
+                <div class="query-input-wrapper">
+                    <input 
+                        type="text" 
+                        id="queryInput" 
+                        class="query-input" 
+                        placeholder="e.g., find all cats, show dogs from last week, list patients named Max..."
+                    />
+                    <button class="btn btn-primary" onclick="processQuery()">
+                        Search FileMaker
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Processing your query...</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results" class="results-section"></div>
+        </div>
+    </div>
+
+    <script>
+        // Debug console functions
+        function logToConsole(message, type = 'info') {
+            const consoleDiv = document.getElementById('consoleOutput');
+            const entry = document.createElement('div');
+            entry.className = `console-entry console-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            consoleDiv.appendChild(entry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function clearConsole() {
+            const consoleDiv = document.getElementById('consoleOutput');
+            consoleDiv.innerHTML = '<div class="console-entry console-info">Console cleared.</div>';
+        }
+
+        // Override console methods
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+            ).join(' ');
+            logToConsole(message, 'success');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+            ).join(' ');
+            logToConsole(message, 'error');
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+            ).join(' ');
+            logToConsole(message, 'warn');
+        };
+
+        // Main query processing - matching server.py workflow
+        async function processQuery() {
+            const query = document.getElementById('queryInput').value;
+            const apiKey = document.getElementById('openaiKey').value;
+            const model = document.getElementById('openaiModel').value;
+
+            logToConsole('⇢ Starting query: ' + query, 'info');
+
+            if (!query) {
+                showError('Please enter a query');
+                return;
+            }
+
+            if (!apiKey) {
+                showError('Please enter your OpenAI API key');
+                return;
+            }
+
+            showLoading(true);
+            clearResults();
+
+            try {
+                // Step 1: Extract keywords using OpenAI (matching server.py)
+                logToConsole('⇢ OpenAI keyword extract...', 'info');
+                const keywords = await extractKeywords(query, apiKey, model);
+                console.log('← OpenAI JSON ok:', keywords);
+                displayDebugInfo('OpenAI Extracted Keywords', keywords);
+
+                // Step 2: Call FileMaker Script with keywords
+                const scriptUrl = document.getElementById('fmScriptUrl').value;
+                const username = document.getElementById('fmUsername').value;
+                const password = document.getElementById('fmPassword').value;
+                const authBasic = document.getElementById('fmAuthBasic').value;
+
+                if (!authBasic && (!username || !password)) {
+                    showError('Enter username and password, or provide Base64 auth string');
+                    return;
+                }
+
+                logToConsole('→ FileMaker via script API...', 'info');
+                const result = await callFileMakerScript(scriptUrl, keywords, username, password, authBasic);
+                
+                // Display results
+                displayFileMakerResults(result);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError(`Error: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Extract keywords exactly like server.py
+        async function extractKeywords(query, apiKey, model) {
+            const systemPrompt = `
+Tu es un générateur de requêtes FileMaker. 
+Objectif: convertir une requête en langage naturel (français ou anglais) en **français** sous forme d'une chaîne compacte de contraintes pour FileMaker.
+
+⚠️ Sortie OBLIGATOIRE: renvoie UNIQUEMENT un objet JSON valide, sans texte additionnel ni code fence:
+{"scriptParameterValue":"<requête_en_français>"}
+
+Règles générales:
+- La valeur "scriptParameterValue" doit être une suite de contraintes séparées par des espaces, par ex:
+  espece = chat poids > 8kg race = siamois sterilise = oui
+- Langue de sortie: **toujours français**.
+- N'inclus pas d’explications, pas de commentaires, pas de guillemets superflus autour des valeurs simples.
+- Conserve les noms propres utiles (ex: "Max", "Labrador", "Bleu russe").
+- Si aucune contrainte n'est détectée, renvoie {"scriptParameterValue":""}.
+
+Champs normalisés (en français):
+- espece   (valeurs: chat, chien, etc. — mappe cat/kitty → chat; dog/puppy → chien)
+- poids    (nombre, assume kg si l’unité n’est pas précisée; accepte kg, kilogrammes)
+- race     (texte libre, ex: labrador, siamois)
+- date_naissance (au format ISO AAAA-MM-JJ si possible; accepte opérateurs)
+- couleur  (texte libre)
+- decede   (oui/non)  — mappe dead/deceased/mort → oui ; alive/not dead → non
+- sterilise (oui/non) — mappe spayed/neutered/fixed → oui ; not sterilized → non
+
+Opérateurs et mots-clés (FR/EN → symbole):
+- égal/égale/égal à/est/=/equal/exactly → =
+- supérieur/supérieure/plus de/au-dessus de/≥?/at least/minimum → > (ou ≥ si "au moins"/"at least")
+- inférieur/moins de/au-dessous de/at most/maximum → < (ou ≤ si "au plus"/"at most")
+- entre X et Y / between X and Y → transforme en deux bornes: "poids >= Xkg poids <= Ykg" (idem pour date_naissance)
+- avant/before → <
+- après/after → >
+- à partir de/since/from → ≥
+- jusqu’à/until → ≤
+
+Règles spécifiques:
+- ESPÈCE: si "cat/chat" → "espece = chat"; si "dog/chien" → "espece = chien".
+- POIDS: extrais le nombre et l’unité (kg si absente). Exemples:
+  "plus de 8" → "poids > 8kg"
+  "au moins 10 kg" → "poids >= 10kg"
+  "entre 5 et 7 kg" → "poids >= 5kg poids <= 7kg"
+- RACE: "breed: labrador" → "race = labrador"
+- DATE DE NAISSANCE: normalise en ISO si possible.
+  "born before 2020" → "date_naissance < 2020-01-01"
+  "né après 2018-06-01" → "date_naissance > 2018-06-01"
+  "entre 2019-01-01 et 2019-12-31" → "date_naissance >= 2019-01-01 date_naissance <= 2019-12-31"
+- COULEUR: "black" → "couleur = noir" (utilise des couleurs FR si trivial; sinon garde tel quel)
+- DÉCÉDÉ: "dead/deceased" → "decede = oui"; "not dead/alive" → "decede = non"
+- STÉRILISÉ: "spayed/neutered/fixed" → "sterilise = oui"; "not sterilized" → "sterilise = non"
+
+Nettoyage:
+- Supprime les mots vides (the, a, de, des, du, pour, tous/toutes, etc.).
+- Ne renvoie que les contraintes pertinentes trouvées.
+- Ordre suggéré: espece, race, poids, date_naissance, couleur, sterilise, decede (mais l’ordre n’est pas strict).
+
+EXEMPLES (entrée → sortie JSON):
+1) "find all cats over 8 kg"
+→ {"scriptParameterValue":"espece = chat poids > 8kg"}
+
+2) "chiens labrador stérilisés, nés avant 2020"
+→ {"scriptParameterValue":"espece = chien race = labrador sterilise = oui date_naissance < 2020-01-01"}
+
+3) "chat couleur noir entre 5 et 7 kg, pas décédé"
+→ {"scriptParameterValue":"espece = chat couleur = noir poids >= 5kg poids <= 7kg decede = non"}
+
+4) "siamois nés après 2019-06-01"
+→ {"scriptParameterValue":"race = siamois date_naissance > 2019-06-01"}
+
+5) "unfixed dogs under 10kg"
+→ {"scriptParameterValue":"espece = chien sterilise = non poids < 10kg"}
+`;
+            // const systemPrompt = `You are a keyword extraction specialist. Extract search keywords from natural language and return ONLY a valid JSON object in this format: {"scriptParameterValue": "keyword1 keyword2 keyword3"}. Remove common words like 'the', 'from', 'for', 'all'. Keep names, dates, and specific terms. Never include explanations, only the JSON.`;
+
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: query }
+                    ],
+                    temperature: 0.0,
+                    max_tokens: 120
+                })
+            });
+
+            logToConsole(`OpenAI Response: ${response.status}`, response.ok ? 'success' : 'error');
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
+            }
+
+            const data = await response.json();
+            let content = data.choices[0].message.content || "";
+            
+            // Strip code fences if present (matching server.py logic)
+            content = content.trim();
+            if (content.startsWith("```")) {
+                content = content.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+            }
+
+            const parsed = JSON.parse(content);
+            if (!parsed.scriptParameterValue) {
+                throw new Error("Missing 'scriptParameterValue' in OpenAI response");
+            }
+            
+            return parsed;
+        }
+
+        // Call FileMaker Script endpoint (matching server.py curl command)
+        async function callFileMakerScript(url, keywords, username, password, authBasic) {
+            // Prepare auth header
+            let authHeader;
+            if (authBasic) {
+                authHeader = `Basic ${authBasic}`;
+                logToConsole('Using provided Base64 auth', 'info');
+            } else {
+                authHeader = `Basic ${btoa(username + ':' + password)}`;
+                logToConsole('Created Basic auth from credentials', 'info');
+            }
+
+            // Prepare the payload EXACTLY like server.py
+            const payload = {
+                scriptParameterValue: keywords.scriptParameterValue
+            };
+
+            console.log('→ FileMaker Script POST:', {
+                url: url,
+                data: payload
+            });
+
+            displayDebugInfo('FileMaker Script Request', {
+                url: url,
+                method: 'POST',
+                payload: payload,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic [REDACTED]'
+                }
+            });
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': authHeader
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                logToConsole(`FileMaker Response: ${response.status}`, response.ok ? 'success' : 'error');
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('FileMaker error response:', errorText);
+                    
+                    displayDebugInfo('FileMaker Error', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        response: errorText
+                    });
+
+                    if (response.status === 401) {
+                        throw new Error('Unauthorized (401): Check username and password');
+                    } else if (response.status === 404) {
+                        throw new Error('Not Found (404): Check script URL');
+                    } else {
+                        throw new Error(`FileMaker error ${response.status}: ${errorText}`);
+                    }
+                }
+
+                const data = await response.json();
+                console.log('← FileMaker raw response:', data);
+
+                // Parse the script result exactly like jq does in server.py
+                // jq expression: .scriptResult.resultParameter | split("\\r")[0] | fromjson
+                if (!data.scriptResult || !data.scriptResult.resultParameter) {
+                    throw new Error('No scriptResult.resultParameter in response');
+                }
+
+                let resultParam = data.scriptResult.resultParameter;
+                
+                // Split by \r and take first part
+                if (resultParam.includes('\r')) {
+                    resultParam = resultParam.split('\r')[0];
+                }
+
+                // Parse as JSON
+                const finalResult = JSON.parse(resultParam);
+                console.log('← FileMaker parsed result:', finalResult);
+                
+                return finalResult;
+
+            } catch (error) {
+                if (error.message.includes('Failed to fetch')) {
+                    logToConsole('Network/CORS error detected', 'error');
+                    displayCurlCommand(url, payload, authHeader);
+                    throw new Error('Network error or CORS blocking. Use the cURL command below.');
+                }
+                throw error;
+            }
+        }
+
+        function displayFileMakerResults(data) {
+            const resultsDiv = document.getElementById('results');
+            
+            // Count records
+            let recordCount = 0;
+            if (Array.isArray(data)) {
+                recordCount = data.length;
+            } else if (data.records && Array.isArray(data.records)) {
+                recordCount = data.records.length;
+            } else if (data.data && Array.isArray(data.data)) {
+                recordCount = data.data.length;
+            } else if (data && typeof data === 'object') {
+                // If it's a single object, count as 1 record
+                recordCount = 1;
+            }
+            
+            // Success message with record count
+            const successBox = document.createElement('div');
+            successBox.className = 'success-message';
+            successBox.textContent = `Successfully retrieved data from FileMaker! Found ${recordCount} record${recordCount !== 1 ? 's' : ''}.`;
+            resultsDiv.appendChild(successBox);
+
+            // Display the parsed JSON result
+            const dataBox = document.createElement('div');
+            dataBox.className = 'debug-box log-section';
+            dataBox.innerHTML = `
+                <h5>📊 FileMaker Script Result</h5>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(dataBox);
+            applyLogVisibility();
+
+            // If it's an array of records, show in table format
+            if (Array.isArray(data)) {
+                displayRecordsTable(data);
+            } else if (data.records && Array.isArray(data.records)) {
+                displayRecordsTable(data.records);
+            } else if (data.data && Array.isArray(data.data)) {
+                displayRecordsTable(data.data);
+            }
+        }
+
+        function displayRecordsTable(records) {
+            if (records.length === 0) return;
+
+            const resultsDiv = document.getElementById('results');
+            const tableBox = document.createElement('div');
+            tableBox.className = 'data-table';
+            
+            // Get all unique keys, filtering out UUID columns
+            const allKeys = [...new Set(records.flatMap(record => Object.keys(record)))];
+            const keys = allKeys.filter(key => {
+                const lowerKey = key.toLowerCase();
+                return !lowerKey.includes('uuid') && !lowerKey.includes('id') && !lowerKey.includes('_id');
+            });
+            
+            // Find date field and add AGE column right after it
+            let dateFieldIndex = -1;
+            let dateFieldName = '';
+            
+            keys.forEach((key, index) => {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey.includes('date') || lowerKey.includes('naissance') || lowerKey.includes('birth')) {
+                    dateFieldIndex = index;
+                    dateFieldName = key;
+                }
+            });
+            
+            if (dateFieldIndex !== -1) {
+                // Insert AGE column right after the date field
+                keys.splice(dateFieldIndex + 1, 0, 'AGE');
+            }
+            
+            // Add table controls
+            const controlsHtml = `
+                <div class="table-controls">
+                    <input type="text" class="filter-input" placeholder="Filter records..." id="tableFilter">
+                    <button class="reset-sort-btn" id="resetSortBtn">Reset Sort</button>
+                    <div class="table-info" id="tableInfo">Showing ${records.length} records</div>
+                </div>
+            `;
+            
+            let tableHtml = controlsHtml + '<table><thead><tr>';
+            keys.forEach((key, index) => {
+                tableHtml += `<th class="sortable" data-column="${index}" data-key="${escapeHtml(key)}">${escapeHtml(key)}</th>`;
+            });
+            tableHtml += '</tr></thead><tbody>';
+            
+            records.forEach(record => {
+                tableHtml += '<tr>';
+                keys.forEach(key => {
+                    if (key === 'AGE') {
+                        // Calculate age
+                        const ageValue = calculateAge(record);
+                        tableHtml += `<td>${escapeHtml(ageValue)}</td>`;
+                    } else {
+                        const value = record[key];
+                        const displayValue = value !== null && value !== undefined ? String(value) : '';
+                        tableHtml += `<td>${escapeHtml(displayValue)}</td>`;
+                    }
+                });
+                tableHtml += '</tr>';
+            });
+            
+            tableHtml += '</tbody></table>';
+            tableBox.innerHTML = tableHtml;
+            
+            // Store original records for filtering
+            tableBox.dataset.originalRecords = JSON.stringify(records);
+            tableBox.dataset.keys = JSON.stringify(keys);
+            
+            // Add click event listeners to headers
+            const headers = tableBox.querySelectorAll('th.sortable');
+            headers.forEach(header => {
+                header.addEventListener('click', () => {
+                    const columnIndex = parseInt(header.dataset.column);
+                    const key = header.dataset.key;
+                    sortTable(tableBox, columnIndex, key, header);
+                });
+            });
+            
+            // Add filter functionality
+            const filterInput = tableBox.querySelector('#tableFilter');
+            filterInput.addEventListener('input', () => {
+                filterTable(tableBox, filterInput.value);
+            });
+            
+            // Add reset sort functionality
+            const resetBtn = tableBox.querySelector('#resetSortBtn');
+            resetBtn.addEventListener('click', () => {
+                resetTableSort(tableBox);
+            });
+            
+            resultsDiv.appendChild(tableBox);
+        }
+
+        function sortTable(tableContainer, columnIndex, key, header) {
+            const table = tableContainer.querySelector('table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Determine sort direction
+            const isAscending = !header.classList.contains('sort-asc');
+            
+            // Clear all sort classes
+            tableContainer.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            
+            // Set current sort class
+            header.classList.add(isAscending ? 'sort-asc' : 'sort-desc');
+            
+            // Sort rows
+            rows.sort((a, b) => {
+                const aValue = a.cells[columnIndex].textContent.trim();
+                const bValue = b.cells[columnIndex].textContent.trim();
+                
+                // Try to parse as numbers
+                const aNum = parseFloat(aValue);
+                const bNum = parseFloat(bValue);
+                
+                let comparison = 0;
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    // Numeric comparison
+                    comparison = aNum - bNum;
+                } else {
+                    // String comparison
+                    comparison = aValue.localeCompare(bValue);
+                }
+                
+                return isAscending ? comparison : -comparison;
+            });
+            
+            // Reorder rows in DOM
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        function filterTable(tableContainer, filterText) {
+            const tbody = tableContainer.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const originalRecords = JSON.parse(tableContainer.dataset.originalRecords);
+            const keys = JSON.parse(tableContainer.dataset.keys);
+            
+            if (!filterText.trim()) {
+                // Show all rows
+                rows.forEach(row => row.style.display = '');
+                updateTableInfo(tableContainer, originalRecords.length);
+                return;
+            }
+            
+            const filterLower = filterText.toLowerCase();
+            let visibleCount = 0;
+            
+            rows.forEach((row, index) => {
+                const record = originalRecords[index];
+                let matches = false;
+                
+                // Check if any field contains the filter text
+                keys.forEach(key => {
+                    if (key === 'AGE') {
+                        // Calculate age for filtering
+                        const ageValue = calculateAge(record);
+                        if (ageValue.toLowerCase().includes(filterLower)) {
+                            matches = true;
+                        }
+                    } else {
+                        const value = record[key];
+                        if (value !== null && value !== undefined) {
+                            const valueStr = String(value).toLowerCase();
+                            if (valueStr.includes(filterLower)) {
+                                matches = true;
+                            }
+                        }
+                    }
+                });
+                
+                if (matches) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            updateTableInfo(tableContainer, visibleCount);
+        }
+
+        function resetTableSort(tableContainer) {
+            // Clear all sort classes
+            const headers = tableContainer.querySelectorAll('th');
+            headers.forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            
+            // Reset to original order
+            const originalRecords = JSON.parse(tableContainer.dataset.originalRecords);
+            const keys = JSON.parse(tableContainer.dataset.keys);
+            const tbody = tableContainer.querySelector('tbody');
+            
+            // Rebuild table with original order
+            let tableHtml = '<tbody>';
+            originalRecords.forEach(record => {
+                tableHtml += '<tr>';
+                keys.forEach(key => {
+                    if (key === 'AGE') {
+                        // Calculate age
+                        const ageValue = calculateAge(record);
+                        tableHtml += `<td>${escapeHtml(ageValue)}</td>`;
+                    } else {
+                        const value = record[key];
+                        const displayValue = value !== null && value !== undefined ? String(value) : '';
+                        tableHtml += `<td>${escapeHtml(displayValue)}</td>`;
+                    }
+                });
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody>';
+            
+            tbody.outerHTML = tableHtml;
+            
+            // Update table info
+            updateTableInfo(tableContainer, originalRecords.length);
+            
+            // Clear filter
+            const filterInput = tableContainer.querySelector('#tableFilter');
+            filterInput.value = '';
+        }
+
+        function updateTableInfo(tableContainer, count) {
+            const tableInfo = tableContainer.querySelector('#tableInfo');
+            tableInfo.textContent = `Showing ${count} records`;
+        }
+
+        function calculateAge(record) {
+            // Look for date fields in the record
+            const dateFields = Object.keys(record).filter(key => {
+                const lowerKey = key.toLowerCase();
+                return lowerKey.includes('date') || lowerKey.includes('naissance') || lowerKey.includes('birth');
+            });
+            
+            if (dateFields.length === 0) {
+                return 'N/A';
+            }
+            
+            // Get the first date field found
+            const dateValue = record[dateFields[0]];
+            if (!dateValue) {
+                return 'N/A';
+            }
+            
+            // Parse the date
+            let birthDate;
+            const dateStr = String(dateValue).trim();
+            
+            // Try different date formats - European formats first
+            if (dateStr.includes('.')) {
+                // European format DD.MM.YYYY
+                const parts = dateStr.split('.');
+                if (parts.length === 3) {
+                    const day = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10);
+                    const year = parseInt(parts[2], 10);
+                    birthDate = new Date(year, month - 1, day);
+                } else {
+                    birthDate = new Date(dateStr);
+                }
+            } else if (dateStr.includes('/')) {
+                // European format DD/MM/YYYY
+                const parts = dateStr.split('/');
+                if (parts.length === 3) {
+                    const day = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10);
+                    const year = parseInt(parts[2], 10);
+                    birthDate = new Date(year, month - 1, day);
+                } else {
+                    birthDate = new Date(dateStr);
+                }
+            } else if (dateStr.includes('-')) {
+                // ISO format YYYY-MM-DD
+                birthDate = new Date(dateStr);
+            } else if (dateStr.length === 8 && /^\d{8}$/.test(dateStr)) {
+                // YYYYMMDD format
+                const year = dateStr.substring(0, 4);
+                const month = dateStr.substring(4, 6);
+                const day = dateStr.substring(6, 8);
+                birthDate = new Date(year, month - 1, day);
+            } else {
+                // Try parsing as is
+                birthDate = new Date(dateStr);
+            }
+            
+            // Check if date is valid
+            if (isNaN(birthDate.getTime())) {
+                return 'Invalid Date';
+            }
+            
+            // Calculate age
+            const today = new Date();
+            let years = today.getFullYear() - birthDate.getFullYear();
+            let months = today.getMonth() - birthDate.getMonth();
+            
+            // Adjust if birthday hasn't occurred this year
+            if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+                years--;
+                months += 12;
+            }
+            
+            // Handle case where birthday is today
+            if (months === 0 && today.getDate() === birthDate.getDate()) {
+                months = 0;
+            }
+            
+            // Format the result
+            if (years === 0) {
+                return `${months} month${months !== 1 ? 's' : ''}`;
+            } else if (months === 0) {
+                return `${years} year${years !== 1 ? 's' : ''}`;
+            } else {
+                return `${years} year${years !== 1 ? 's' : ''} ${months} month${months !== 1 ? 's' : ''}`;
+            }
+        }
+
+        function displayCurlCommand(url, payload, authHeader) {
+            const resultsDiv = document.getElementById('results');
+            
+            // Build curl command matching server.py format
+            const payloadJson = JSON.stringify(payload);
+            const curlCommand = `curl -sS -X POST "${url}" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: ${authHeader}" \\
+  --data '${payloadJson}' \\
+  | jq -r '.scriptResult.resultParameter | split("\\\\r")[0] | fromjson'`;
+            
+            const curlBox = document.createElement('div');
+            curlBox.className = 'result-box log-section';
+            curlBox.innerHTML = `
+                <h4>cURL Command (matching server.py - use in terminal)</h4>
+                <div class="code-block">${escapeHtml(curlCommand)}</div>
+                <p style="margin-top: 10px; color: #666;">This is the exact command from server.py. Run it in terminal to test.</p>
+            `;
+            
+            resultsDiv.appendChild(curlBox);
+            applyLogVisibility();
+
+            // Also show without jq for debugging
+            const simpleCurl = `curl -sS -X POST "${url}" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: ${authHeader}" \\
+  --data '${payloadJson}'`;
+
+            const simpleBox = document.createElement('div');
+            simpleBox.className = 'result-box log-section';
+            simpleBox.innerHTML = `
+                <h4>Simple cURL (without jq parsing)</h4>
+                <div class="code-block">${escapeHtml(simpleCurl)}</div>
+            `;
+            resultsDiv.appendChild(simpleBox);
+            applyLogVisibility();
+        }
+
+        function displayDebugInfo(title, data) {
+            const resultsDiv = document.getElementById('results');
+            
+            const debugBox = document.createElement('div');
+            debugBox.className = 'debug-box log-section';
+            debugBox.innerHTML = `
+                <h5>🔍 ${title}</h5>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            
+            resultsDiv.appendChild(debugBox);
+            applyLogVisibility();
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('active', show);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function showError(message) {
+            const resultsDiv = document.getElementById('results');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            resultsDiv.appendChild(errorDiv);
+            logToConsole('ERROR: ' + message, 'error');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('queryInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                processQuery();
+            }
+        });
+
+        // Log visibility toggle functionality
+        let logsVisible = true;
+        let configVisible = true;
+
+        function toggleLogs() {
+            logsVisible = !logsVisible;
+            const settingsText = document.getElementById('settingsText');
+            
+            // Get all log sections (debug console + dynamically created debug boxes)
+            const debugConsole = document.getElementById('debugConsole');
+            const allLogSections = document.querySelectorAll('.log-section');
+            
+            if (logsVisible) {
+                // Show all log sections
+                allLogSections.forEach(section => {
+                    section.classList.remove('hidden');
+                });
+                settingsText.textContent = 'Hide Logs';
+                logToConsole('All debug sections shown', 'info');
+            } else {
+                // Hide all log sections
+                allLogSections.forEach(section => {
+                    section.classList.add('hidden');
+                });
+                settingsText.textContent = 'Show Logs';
+            }
+            
+            // Save preference to localStorage
+            localStorage.setItem('logsVisible', logsVisible.toString());
+        }
+
+        // Load saved preference on page load
+        function loadLogsPreference() {
+            const savedPreference = localStorage.getItem('logsVisible');
+            if (savedPreference !== null) {
+                logsVisible = savedPreference === 'true';
+                if (!logsVisible) {
+                    // Hide all existing log sections
+                    const allLogSections = document.querySelectorAll('.log-section');
+                    allLogSections.forEach(section => {
+                        section.classList.add('hidden');
+                    });
+                    document.getElementById('settingsText').textContent = 'Show Logs';
+                }
+            }
+        }
+
+        // Function to apply current visibility setting to new log sections
+        function applyLogVisibility() {
+            if (!logsVisible) {
+                const allLogSections = document.querySelectorAll('.log-section');
+                allLogSections.forEach(section => {
+                    section.classList.add('hidden');
+                });
+            }
+        }
+
+        // Config visibility toggle functionality
+        function toggleConfig() {
+            configVisible = !configVisible;
+            const configText = document.getElementById('configText');
+            
+            // Get all config sections
+            const allConfigSections = document.querySelectorAll('.config-section');
+            
+            if (configVisible) {
+                // Show all config sections
+                allConfigSections.forEach(section => {
+                    section.classList.remove('hidden');
+                });
+                configText.textContent = 'Hide Config';
+                logToConsole('All config sections shown', 'info');
+            } else {
+                // Hide all config sections
+                allConfigSections.forEach(section => {
+                    section.classList.add('hidden');
+                });
+                configText.textContent = 'Show Config';
+            }
+            
+            // Save preference to localStorage
+            localStorage.setItem('configVisible', configVisible.toString());
+        }
+
+        // Load saved config preference on page load
+        function loadConfigPreference() {
+            const savedPreference = localStorage.getItem('configVisible');
+            if (savedPreference !== null) {
+                configVisible = savedPreference === 'true';
+                if (!configVisible) {
+                    // Hide all existing config sections
+                    const allConfigSections = document.querySelectorAll('.config-section');
+                    allConfigSections.forEach(section => {
+                        section.classList.add('hidden');
+                    });
+                    document.getElementById('configText').textContent = 'Show Config';
+                }
+            }
+        }
+
+        // Initialize on page load
+        loadLogsPreference();
+        loadConfigPreference();
+
+        // Test console on load
+        logToConsole('Page loaded. FileMaker Script API ready!', 'success');
+        console.warn('Note: This calls FileMaker Script endpoint, not OData tables directly');
+    </script>
+</body>
+</html>
