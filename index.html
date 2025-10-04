@@ -5,59 +5,79 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Digimidi Query Builder</title>
   <style>
-    :root { --bg:#f6f7f9; --fg:#1f2937; --muted:#6b7280; --accent:#111827; --ok:#065f46; --err:#7f1d1d; --border:#e5e7eb; }
+    :root { --bg:#f6f7f9; --fg:#1f2937; --muted:#6b7280; --accent:#0f172a; --ok:#065f46; --err:#7f1d1d; --border:#e5e7eb; }
     * { box-sizing: border-box; }
     body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     .wrap { max-width:1100px; margin:40px auto; padding:0 16px; }
     header { margin-bottom:16px; }
-    h1 { margin:0 0 8px; font-weight:600; font-size:22px; }
+    h1 { margin:0 0 8px; font-weight:700; font-size:22px; }
     p.lead { margin:0; color:var(--muted); }
     .bar { display:flex; gap:8px; margin:16px 0 0; }
-    input.query, input.filter, input.search { flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:8px; outline:none; font-size:15px; }
-    input.query:focus, input.filter:focus, input.search:focus { border-color:#cbd5e1; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
-    button.go { padding:10px 14px; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; font-weight:600; }
+    input.query, input.filter, input.search {
+      flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; outline:none; font-size:15px; background:#fff;
+    }
+    input.query:focus, input.filter:focus, input.search:focus {
+      border-color:#cbd5e1; box-shadow:0 0 0 3px rgba(59,130,246,.15);
+    }
+    button.go { padding:10px 14px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; font-weight:700; }
     button.go[disabled] { opacity:.6; cursor:progress; }
-    .card { background:#fff; border:1px solid #eef0f3; border-radius:12px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,.04); margin-top:16px; }
-    .msg { padding:10px 12px; border-radius:8px; margin:8px 0 0; font-size:14px; }
+    .card { background:#fff; border:1px solid #eef0f3; border-radius:16px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,.04); margin-top:16px; }
+    .msg { padding:10px 12px; border-radius:10px; margin:8px 0 0; font-size:14px; }
     .msg.ok { background:#ecfdf5; color:var(--ok); border:1px solid #a7f3d0; }
     .msg.err { background:#fef2f2; color:var(--err); border:1px solid #fecaca; white-space:pre-wrap; }
     .muted { color:var(--muted); font-size:14px; }
     .spinner { display:inline-block; width:16px; height:16px; border:2px solid #fff; border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-3px; margin-right:6px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Table */
     .toolbar { display:flex; gap:8px; align-items:center; justify-content:space-between; margin:8px 0 0; flex-wrap:wrap; }
     .count { font-size:14px; color:var(--muted); }
-    table { width:100%; border-collapse:separate; border-spacing:0; margin-top:10px; }
-    thead th { position:sticky; top:0; background:#f8fafc; z-index:1; border-bottom:1px solid var(--border); text-align:left; padding:10px; font-size:14px; cursor:pointer; }
+
+    .table-scroll { width:100%; overflow:auto; border:1px solid var(--border); border-radius:12px; }
+    table { min-width: 800px; width:100%; border-collapse:separate; border-spacing:0; }
+    thead th {
+      position:sticky; top:0; background:#f8fafc; z-index:1;
+      border-bottom:1px solid var(--border); text-align:left; padding:10px; font-size:14px; cursor:pointer; white-space:nowrap;
+    }
     thead th.sortable:hover { background:#eef2f7; }
     tbody td { border-bottom:1px solid var(--border); padding:10px; font-size:14px; }
-    .filters { display:grid; grid-template-columns: repeat(7, 1fr); gap:6px; margin-top:10px; }
+    .filters { display:grid; grid-template-columns: repeat(7, minmax(130px,1fr)); gap:6px; margin:10px 0; }
     .nowrap { white-space:nowrap; }
+
+    /* Responsive : masque quelques colonnes en petit écran */
+    @media (max-width: 900px) {
+      .filters { grid-template-columns: repeat(4, 1fr); }
+      th.col-id, td.col-id { display:none; }
+    }
+    @media (max-width: 720px) {
+      .bar { flex-direction:column; }
+      .filters { grid-template-columns: repeat(2, 1fr); }
+      th.col-date, td.col-date { display:none; }
+      th.col-espece, td.col-espece { display:none; }
+      table { min-width: 0; } /* autorise le wrap + scroll */
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <h1>🤖 Digimidi Query Builder</h1>
-      <p class="lead">Le navigateur appelle <code>/api/filemaker</code> (proxy serveur). Les données sont affichées en tableau triable & filtrable.</p>
+      <p class="lead">Le navigateur appelle <code>/api/filemaker</code> (proxy serveur). Données affichées en tableau triable & filtrable.</p>
       <div class="bar">
-        <input id="q" class="query" placeholder="Ex. : chiens > 50 kg non stérilisés" />
+        <input id="q" class="query" placeholder="Ex. : dogs > 50 kg not sterilized" />
         <button id="go" class="go" onclick="processQuery()">Rechercher</button>
       </div>
       <p class="muted">Astuce : Entrée pour lancer la recherche.</p>
     </header>
 
-    <section id="panel" class="card">
+    <section class="card">
       <div id="status" class="muted">Prêt.</div>
       <div id="messages"></div>
 
       <div class="toolbar">
         <input id="globalSearch" class="search" placeholder="🔎 Recherche globale (nom, race, espèce…)" />
-        <div class="count" id="count">0 éléments</div>
+        <div class="count" id="count">0 élément</div>
       </div>
 
-      <!-- Filtres par colonne -->
       <div class="filters">
         <input class="filter" data-key="nom" placeholder="Filtrer: nom" />
         <input class="filter" data-key="espece" placeholder="Filtrer: espèce" />
@@ -68,8 +88,7 @@
         <input class="filter" data-key="id" placeholder="Filtrer: id" />
       </div>
 
-      <div id="tableWrap"></div>
-      <div id="out" style="display:none"></div>
+      <div id="tableWrap" class="table-scroll"></div>
     </section>
   </div>
 
@@ -78,15 +97,14 @@
     const go = document.getElementById('go');
     const statusEl = document.getElementById('status');
     const messagesEl = document.getElementById('messages');
-    const outEl = document.getElementById('out');
     const tableWrap = document.getElementById('tableWrap');
     const countEl = document.getElementById('count');
     const globalSearch = document.getElementById('globalSearch');
     const filterInputs = Array.from(document.querySelectorAll('.filter'));
 
-    let rawRows = [];   // données brutes parsées
-    let viewRows = [];  // données filtrées/triées
-    let sortState = { key: 'nom', dir: 'asc' };
+    let rawRows = [];
+    let viewRows = [];
+    let sortState = { key: 'poids', dir: 'asc' };
 
     q.addEventListener('keydown', e => { if (e.key === 'Enter') processQuery(); });
     globalSearch.addEventListener('input', applyFilters);
@@ -101,55 +119,66 @@
       const div = document.createElement('div');
       div.className = `msg ${kind}`;
       div.textContent = text;
+      messagesEl.innerHTML = '';
       messagesEl.appendChild(div);
     }
     function showError(msg){ showMsg(msg, 'err'); }
-    function escapeHtml(str){ return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function escapeHtml(str){ return (str??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     function normalizeRow(r){
-      // Convertit les clés FR/espaces vers des clés stables pour l'affichage/tri/filtre
       return {
         nom: r.nom ?? '',
         espece: r.espece ?? '',
         race: r.race ?? '',
-        poids: (r.poids === '' || r.poids === null || r.poids === undefined) ? null : Number(r.poids),
+        poids: (r.poids === '' || r.poids == null) ? null : Number(r.poids),
         sterilisee: (r['sterilisée'] ?? r.sterilisee ?? '').toString().trim().toUpperCase(),
         date_naissance: r['date naissance'] ?? r.date_naissance ?? '',
         id: r.id ?? ''
       };
     }
 
-    function parseResultParameter(payload){
-      // payload peut être { resultParameter: "<string JSON>" } ou similaire
-      if (!payload) return [];
-      const rp = payload.resultParameter ?? payload.ResultParameter ?? payload.result ?? payload;
-      if (Array.isArray(rp)) return rp.map(normalizeRow);
-      if (typeof rp !== 'string') return [];
+    // récupère un array JSON où qu’il se cache (objet, string, texte brut)
+    function extractArrayFromAny(any) {
+      if (!any) return [];
+      if (Array.isArray(any)) return any;
 
-      // extrait la première grosse liste JSON [ ... ] du texte
-      const start = rp.indexOf('[');
-      const end = rp.lastIndexOf(']');
-      if (start === -1 || end === -1 || end <= start) return [];
-      const jsonSlice = rp.slice(start, end + 1);
-
-      try {
-        const arr = JSON.parse(jsonSlice);
-        return arr.map(normalizeRow);
-      } catch (e) {
-        console.error('JSON parse error', e);
-        return [];
+      // cas 1 : objet avec resultParameter
+      if (typeof any === 'object') {
+        const cand = any.resultParameter ?? any.ResultParameter ?? any.result ?? any.data ?? null;
+        if (cand) return extractArrayFromAny(cand);
+        // parfois la réponse est une string JSON complète
+        if (any.raw) return extractArrayFromAny(any.raw);
       }
+
+      // cas 2 : string
+      if (typeof any === 'string') {
+        // si la string elle-même est un JSON valide
+        try {
+          const parsed = JSON.parse(any);
+          return extractArrayFromAny(parsed);
+        } catch (_) {}
+
+        // sinon, on isole le premier [ ... ] équilibré
+        const start = any.indexOf('[');
+        const end = any.lastIndexOf(']');
+        if (start !== -1 && end !== -1 && end > start) {
+          const slice = any.slice(start, end + 1);
+          try { return JSON.parse(slice); } catch(_) {}
+        }
+      }
+
+      return [];
     }
 
     function renderTable(rows){
       const headers = [
         { key:'nom', label:'Nom' },
-        { key:'espece', label:'Espèce' },
+        { key:'espece', label:'Espèce', class:'col-espece' },
         { key:'race', label:'Race' },
         { key:'poids', label:'Poids (kg)', class:'nowrap' },
         { key:'sterilisee', label:'Stérilisée' },
-        { key:'date_naissance', label:'Date naissance', class:'nowrap' },
-        { key:'id', label:'ID' },
+        { key:'date_naissance', label:'Date naissance', class:'nowrap col-date' },
+        { key:'id', label:'ID', class:'col-id' },
       ];
 
       const ths = headers.map(h => {
@@ -161,12 +190,12 @@
       const trs = rows.map(r => `
         <tr>
           <td>${escapeHtml(r.nom)}</td>
-          <td>${escapeHtml(r.espece)}</td>
+          <td class="col-espece">${escapeHtml(r.espece)}</td>
           <td>${escapeHtml(r.race)}</td>
           <td class="nowrap">${r.poids ?? ''}</td>
           <td>${escapeHtml(r.sterilisee)}</td>
-          <td class="nowrap">${escapeHtml(r.date_naissance)}</td>
-          <td>${escapeHtml(r.id)}</td>
+          <td class="nowrap col-date">${escapeHtml(r.date_naissance)}</td>
+          <td class="col-id">${escapeHtml(r.id)}</td>
         </tr>
       `).join('');
 
@@ -177,18 +206,16 @@
         </table>
       `;
 
-      // bind tri
+      // tri
       tableWrap.querySelectorAll('th.sortable').forEach(th => {
         th.addEventListener('click', () => {
           const key = th.getAttribute('data-key');
           if (sortState.key === key) {
             sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
           } else {
-            sortState.key = key;
-            sortState.dir = 'asc';
+            sortState.key = key; sortState.dir = 'asc';
           }
-          applySort();
-          renderTable(viewRows);
+          applySort(); renderTable(viewRows);
         });
       });
 
@@ -199,40 +226,34 @@
       const { key, dir } = sortState;
       const collator = new Intl.Collator('fr', { sensitivity:'base', numeric:true });
       viewRows.sort((a,b) => {
-        let av = a[key], bv = b[key];
         if (key === 'poids') {
-          av = (av ?? -Infinity);
-          bv = (bv ?? -Infinity);
+          const av = a.poids ?? -Infinity;
+          const bv = b.poids ?? -Infinity;
           return dir === 'asc' ? (av - bv) : (bv - av);
         }
-        const r = collator.compare(String(av ?? ''), String(bv ?? ''));
+        const r = collator.compare(String(a[key] ?? ''), String(b[key] ?? ''));
         return dir === 'asc' ? r : -r;
       });
     }
 
     function matchFilter(row, key, val){
       if (!val) return true;
-      val = val.trim();
-      if (!val) return true;
+      val = val.trim(); if (!val) return true;
 
-      // Opérateurs simples pour poids: >, >=, <, <=, =
       if (key === 'poids') {
         const m = val.match(/^(>=|<=|>|<|=)\s*([\d.,]+)$/);
         if (m) {
-          const op = m[1]; const num = Number(m[2].replace(',','.'));
+          const op = m[1], num = Number(m[2].replace(',','.'));
           const v = Number(row.poids ?? NaN);
           if (Number.isNaN(v)) return false;
-          switch(op){
-            case '>':  return v >  num;
-            case '>=': return v >= num;
-            case '<':  return v <  num;
-            case '<=': return v <= num;
-            case '=':  return v === num;
-          }
+          return op === '>' ? v > num :
+                 op === '>=' ? v >= num :
+                 op === '<' ? v < num :
+                 op === '<=' ? v <= num :
+                 v === num;
         }
       }
 
-      // par défaut: contient (case-insensitive)
       const hay = String(row[key] ?? '').toLowerCase();
       return hay.includes(val.toLowerCase());
     }
@@ -242,12 +263,10 @@
       const perCol = Object.fromEntries(filterInputs.map(i => [i.dataset.key, i.value || '']));
 
       viewRows = rawRows.filter(r => {
-        // global
         if (qGlob) {
           const s = `${r.nom} ${r.espece} ${r.race} ${r.sterilisee} ${r.date_naissance} ${r.id}`.toLowerCase();
           if (!s.includes(qGlob)) return false;
         }
-        // per-column
         for (const [k,v] of Object.entries(perCol)) {
           if (!matchFilter(r, k, v)) return false;
         }
@@ -261,28 +280,34 @@
     async function processQuery() {
       const query = q.value.trim();
       messagesEl.innerHTML = '';
-      outEl.innerHTML = '';
       tableWrap.innerHTML = '';
       if (!query) return showError('Merci de saisir une requête.');
 
       try {
         setLoading(true);
 
+        // On lit TOUJOURS en texte puis on essaie de parser JSON (robuste aux content-types exotiques)
         const resp = await fetch('/api/filemaker', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scriptParameterValue: query })
         });
+        const rawText = await resp.text();
 
-        const contentType = resp.headers.get('content-type') || '';
-        let data = contentType.includes('application/json') ? await resp.json() : { raw: await resp.text() };
-        if (!resp.ok) { showError(`Erreur ${resp.status} : ${JSON.stringify(data, null, 2)}`); return; }
+        let payload;
+        try { payload = JSON.parse(rawText); } catch { payload = { raw: rawText }; }
 
-        // Parse les lignes depuis resultParameter
-        rawRows = parseResultParameter(data).map(r => r);
+        if (!resp.ok) {
+          showError(`Erreur ${resp.status} : ${rawText.slice(0, 300)}…`);
+          return;
+        }
+
+        // -> extraction ultra tolérante
+        const arr = extractArrayFromAny(payload);
+        rawRows = Array.isArray(arr) ? arr.map(normalizeRow) : [];
         viewRows = [...rawRows];
-        showMsg('Réponse reçue ✔︎');
 
+        showMsg('Réponse reçue ✔︎', 'ok');
         applySort();
         renderTable(viewRows);
       } catch (err) {
