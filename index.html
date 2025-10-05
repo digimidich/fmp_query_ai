@@ -128,14 +128,11 @@
     const nextPageBtn = document.getElementById('nextPage');
     const pageInfoEl = document.getElementById('pageInfo');
 
-    // Ensure pageSize matches the current <select> value on load
-    pageSize = parseInt(pageSizeSel.value, 10) || 10;
-
     let rawRows = [];
     let viewRows = [];
     let sortState = { key: 'poids', dir: 'asc' };
     /* Pagination */
-    let pageSize = 10;
+    let pageSize = parseInt(pageSizeSel.value, 10) || 10; // initialize after selecting the element
     let currentPage = 1;
 
     // ---- Settings (show/hide raw debug) ----
