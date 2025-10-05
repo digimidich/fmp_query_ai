@@ -303,18 +303,19 @@ ${head}
     }
 
     function normalizeRow(r){
+      const U = v => String(v ?? '').toLocaleUpperCase('fr-FR');
       const steriliseeRaw = r['sterilisée'] ?? r['stérilisée'] ?? r.sterilisee ?? r.sterilized ?? '';
       const dateN = r['date naissance'] ?? r.date_naissance ?? r.dateNaissance ?? r.birth_date ?? '';
       const birthParsed = parseEuDate(dateN);
       const age = ageFromDate(birthParsed);
       return {
-        nom: r.nom ?? r.name ?? '',
-        espece: r.espece ?? r.espèce ?? r.species ?? '',
-        race: r.race ?? r.breed ?? '',
+        nom: U(r.nom ?? r.name ?? ''),
+        espece: U(r.espece ?? r.espèce ?? r.species ?? ''),
+        race: U(r.race ?? r.breed ?? ''),
         poids: (r.poids === '' || r.poids == null) ? null : Number(r.poids),
-        sterilisee: String(steriliseeRaw ?? '').trim().toUpperCase(),
-        date_naissance: dateN,
-        age_label: age.label,
+        sterilisee: U(steriliseeRaw),
+        date_naissance: dateN, // keep original DD.MM.YYYY or DD/MM/YYYY as given
+        age_label: U(age.label),
         age_months: age.totalMonths,
         id: r.id ?? r.ID ?? r.Id ?? ''
       };
