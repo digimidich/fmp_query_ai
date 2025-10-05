@@ -59,7 +59,6 @@
     /* Responsive : masque quelques colonnes en petit écran */
     @media (max-width: 900px) {
       .filters { grid-template-columns: repeat(4, 1fr); }
-      th.col-id, td.col-id { display:none; }
     }
     @media (max-width: 720px) {
       .bar { flex-direction:column; }
@@ -157,6 +156,49 @@
     function showError(msg){ showMsg(msg, 'err'); }
     function escapeHtml(str){ return (str??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+    // Parse European dates like dd.MM.yyyy or dd/MM/yyyy, but also accept ISO yyyy-MM-dd
+    function parseEuDate(input) {
+      if (!input) return null;
+      const s = String(input).trim();
+      if (!s) return null;
+
+      // If already ISO-like
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const [Y,M,D] = s.split('-').map(n=>parseInt(n,10));
+        const dt = new Date(Date.UTC(Y, M-1, D));
+        return isNaN(dt.getTime()) ? null : dt;
+      }
+
+      // dd.MM.yyyy or dd/MM/yyyy (also tolerate single-digit day/month)
+      const m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+      if (m) {
+        const D = parseInt(m[1],10);
+        const M = parseInt(m[2],10);
+        const Y = parseInt(m[3],10);
+        if (Y>=1900 && M>=1 && M<=12 && D>=1 && D<=31) {
+          const dt = new Date(Date.UTC(Y, M-1, D));
+          return isNaN(dt.getTime()) ? null : dt;
+        }
+      }
+
+      return null;
+    }
+
+    // Compute age as {years, months, label, totalMonths}
+    function ageFromDate(birthDate) {
+      if (!birthDate) return { years: null, months: null, totalMonths: null, label: '' };
+      const now = new Date();
+      // Use UTC components to avoid TZ edge cases
+      let y = now.getUTCFullYear() - birthDate.getUTCFullYear();
+      let m = now.getUTCMonth() - birthDate.getUTCMonth();
+      const d = now.getUTCDate() - birthDate.getUTCDate();
+      if (d < 0) m -= 1; // if day not reached, borrow a month
+      if (m < 0) { y -= 1; m += 12; }
+      const total = y*12 + m;
+      const label = (y==null) ? '' : `${y} an${y>1?'s':''} ${m} mois`;
+      return { years: y, months: m, totalMonths: total, label };
+    }
+
     // récupère un array JSON où qu’il se cache (objet, string, texte brut)
     function extractArrayFromAny(any) {
       if (!any) return [];
@@ -239,6 +281,8 @@ ${head}
     function normalizeRow(r){
       const steriliseeRaw = r['sterilisée'] ?? r['stérilisée'] ?? r.sterilisee ?? r.sterilisee ?? r.sterilized ?? '';
       const dateN = r['date naissance'] ?? r.date_naissance ?? r.dateNaissance ?? r.birth_date ?? '';
+      const birthParsed = parseEuDate(dateN);
+      const age = ageFromDate(birthParsed);
       return {
         nom: r.nom ?? r.name ?? '',
         espece: r.espece ?? r.espèce ?? r.species ?? '',
@@ -246,6 +290,8 @@ ${head}
         poids: (r.poids === '' || r.poids == null) ? null : Number(r.poids),
         sterilisee: String(steriliseeRaw ?? '').trim().toUpperCase(),
         date_naissance: dateN,
+        age_label: age.label,
+        age_months: age.totalMonths,
         id: r.id ?? r.ID ?? r.Id ?? ''
       };
     }
@@ -256,9 +302,9 @@ ${head}
         { key:'espece', label:'Espèce', class:'col-espece' },
         { key:'race', label:'Race' },
         { key:'poids', label:'Poids (kg)', class:'nowrap' },
+        { key:'age', label:'Âge' },
         { key:'sterilisee', label:'Stérilisée' },
         { key:'date_naissance', label:'Date naissance', class:'nowrap col-date' },
-        { key:'id', label:'ID', class:'col-id' },
       ];
 
       const ths = headers.map(h => {
@@ -273,9 +319,9 @@ ${head}
           <td class="col-espece">${escapeHtml(r.espece)}</td>
           <td>${escapeHtml(r.race)}</td>
           <td class="nowrap">${r.poids ?? ''}</td>
+          <td>${escapeHtml(r.age_label)}</td>
           <td>${escapeHtml(r.sterilisee)}</td>
           <td class="nowrap col-date">${escapeHtml(r.date_naissance)}</td>
-          <td class="col-id">${escapeHtml(r.id)}</td>
         </tr>
       `).join('');
       if (!trs) {
@@ -314,6 +360,11 @@ ${head}
           const bv = b.poids ?? -Infinity;
           return dir === 'asc' ? (av - bv) : (bv - av);
         }
+        if (key === 'age') {
+          const av = (a.age_months ?? -Infinity);
+          const bv = (b.age_months ?? -Infinity);
+          return dir === 'asc' ? (av - bv) : (bv - av);
+        }
         const r = collator.compare(String(a[key] ?? ''), String(b[key] ?? ''));
         return dir === 'asc' ? r : -r;
       });
@@ -324,7 +375,7 @@ ${head}
 
       viewRows = rawRows.filter(r => {
         if (!qGlob) return true;
-        const s = `${r.nom} ${r.espece} ${r.race} ${r.sterilisee} ${r.date_naissance} ${r.id} ${r.poids ?? ''}`.toLowerCase();
+        const s = `${r.nom} ${r.espece} ${r.race} ${r.sterilisee} ${r.date_naissance} ${r.age_label} ${r.poids ?? ''}`.toLowerCase();
         return s.includes(qGlob);
       });
 
