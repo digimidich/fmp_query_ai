@@ -26,10 +26,10 @@
     h1 { margin:0 0 8px; font-weight:700; font-size:22px; }
     p.lead { margin:0; color:var(--muted); }
     .bar { display:flex; gap:8px; margin:16px 0 0; }
-    input.query, input.filter, input.search {
+    input.query, input.search {
       flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; outline:none; font-size:15px; background:#fff;
     }
-    input.query:focus, input.filter:focus, input.search:focus {
+    input.query:focus, input.search:focus {
       border-color:#cbd5e1; box-shadow:0 0 0 3px rgba(59,130,246,.15);
     }
     button.go { padding:10px 14px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; font-weight:700; }
@@ -45,6 +45,12 @@
     .toolbar { display:flex; gap:8px; align-items:center; justify-content:space-between; margin:8px 0 0; flex-wrap:wrap; }
     .count { font-size:14px; color:var(--muted); }
 
+    .pager { display:flex; align-items:center; gap:8px; }
+    .pager button { padding:6px 10px; border:1px solid var(--border); background:#fff; border-radius:8px; cursor:pointer; }
+    .pager button:disabled { opacity:.5; cursor:not-allowed; }
+    .pager select { padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:#fff; }
+    .page-info { font-size:14px; color:var(--muted); }
+
     .table-scroll { width:100%; overflow:auto; border:1px solid var(--border); border-radius:12px; }
     table { min-width: 800px; width:100%; border-collapse:separate; border-spacing:0; }
     thead th {
@@ -53,19 +59,14 @@
     }
     thead th.sortable:hover { background:#eef2f7; }
     tbody td { border-bottom:1px solid var(--border); padding:10px; font-size:14px; }
-    .filters { display:grid; grid-template-columns: repeat(7, minmax(130px,1fr)); gap:6px; margin:10px 0; }
     .nowrap { white-space:nowrap; }
 
-    /* Responsive : masque quelques colonnes en petit écran */
-    @media (max-width: 900px) {
-      .filters { grid-template-columns: repeat(4, 1fr); }
-    }
+    /* Responsive: hide some columns on small screens */
     @media (max-width: 720px) {
       .bar { flex-direction:column; }
-      .filters { grid-template-columns: repeat(2, 1fr); }
       th.col-date, td.col-date { display:none; }
       th.col-espece, td.col-espece { display:none; }
-      table { min-width: 0; } /* autorise le wrap + scroll */
+      table { min-width: 0; }
     }
   </style>
 </head>
@@ -93,10 +94,18 @@
 
       <div class="toolbar">
         <input id="globalSearch" class="search" placeholder="🔎 Recherche globale (nom, race, espèce…)" />
+        <div class="pager">
+          <label class="muted" for="pageSize" style="margin-right:4px;">Par page:</label>
+          <select id="pageSize">
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+          </select>
+          <button id="prevPage">◀︎</button>
+          <button id="nextPage">▶︎</button>
+          <span id="pageInfo" class="page-info">—</span>
+        </div>
         <div class="count" id="count">0 élément</div>
       </div>
-
-
 
       <div id="tableWrap" class="table-scroll"></div>
     </section>
@@ -114,10 +123,17 @@
     const settingsBtn = document.getElementById('settingsBtn');
     const settingsMenu = document.getElementById('settingsMenu');
     const toggleRaw = document.getElementById('toggleRaw');
+    const pageSizeSel = document.getElementById('pageSize');
+    const prevPageBtn = document.getElementById('prevPage');
+    const nextPageBtn = document.getElementById('nextPage');
+    const pageInfoEl = document.getElementById('pageInfo');
 
     let rawRows = [];
     let viewRows = [];
     let sortState = { key: 'poids', dir: 'asc' };
+    /* Pagination */
+    let pageSize = 10;
+    let currentPage = 1;
 
     // ---- Settings (show/hide raw debug) ----
     function setDebugVisible(v){
@@ -125,7 +141,6 @@
       toggleRaw.checked = !!v;
       debugEl.style.display = v ? 'block' : 'none';
     }
-    // initial state
     setDebugVisible(localStorage.getItem('showRaw') === '1');
 
     settingsBtn.addEventListener('click', () => {
@@ -140,6 +155,19 @@
 
     q.addEventListener('keydown', e => { if (e.key === 'Enter') processQuery(); });
     globalSearch.addEventListener('input', applyFilters);
+
+    pageSizeSel.addEventListener('change', () => {
+      pageSize = parseInt(pageSizeSel.value, 10) || 10;
+      currentPage = 1;
+      renderTable(viewRows);
+    });
+    prevPageBtn.addEventListener('click', () => {
+      if (currentPage > 1) { currentPage -= 1; renderTable(viewRows); }
+    });
+    nextPageBtn.addEventListener('click', () => {
+      const totalPages = getTotalPages(viewRows.length);
+      if (currentPage < totalPages) { currentPage += 1; renderTable(viewRows); }
+    });
 
     function setLoading(isLoading) {
       go.disabled = isLoading;
@@ -156,20 +184,17 @@
     function showError(msg){ showMsg(msg, 'err'); }
     function escapeHtml(str){ return (str??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-    // Parse European dates like dd.MM.yyyy or dd/MM/yyyy, but also accept ISO yyyy-MM-dd
+    // Parse European dates like dd.MM.yyyy or dd/MM/yyyy, also accept ISO yyyy-MM-dd
     function parseEuDate(input) {
       if (!input) return null;
       const s = String(input).trim();
       if (!s) return null;
 
-      // If already ISO-like
       if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
         const [Y,M,D] = s.split('-').map(n=>parseInt(n,10));
         const dt = new Date(Date.UTC(Y, M-1, D));
         return isNaN(dt.getTime()) ? null : dt;
       }
-
-      // dd.MM.yyyy or dd/MM/yyyy (also tolerate single-digit day/month)
       const m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
       if (m) {
         const D = parseInt(m[1],10);
@@ -180,7 +205,6 @@
           return isNaN(dt.getTime()) ? null : dt;
         }
       }
-
       return null;
     }
 
@@ -188,33 +212,28 @@
     function ageFromDate(birthDate) {
       if (!birthDate) return { years: null, months: null, totalMonths: null, label: '' };
       const now = new Date();
-      // Use UTC components to avoid TZ edge cases
       let y = now.getUTCFullYear() - birthDate.getUTCFullYear();
       let m = now.getUTCMonth() - birthDate.getUTCMonth();
       const d = now.getUTCDate() - birthDate.getUTCDate();
-      if (d < 0) m -= 1; // if day not reached, borrow a month
+      if (d < 0) m -= 1;
       if (m < 0) { y -= 1; m += 12; }
       const total = y*12 + m;
-      const label = (y==null) ? '' : `${y} an${y>1?'s':''} ${m} mois`;
+      const label = `${y} an${y>1?'s':''} ${m} mois`;
       return { years: y, months: m, totalMonths: total, label };
     }
 
-    // récupère un array JSON où qu’il se cache (objet, string, texte brut)
+    // Robust extraction of an array payload wherever it hides
     function extractArrayFromAny(any) {
       if (!any) return [];
       if (Array.isArray(any)) return any;
 
-      // Cas objet : on teste d'abord les schémas connus puis on explore récursivement toutes les clés
       if (typeof any === 'object') {
-        // 1) OData : { value: [ { resultParameter: "..." } ] }
         if (Array.isArray(any.value) && any.value.length) {
           const v0 = any.value[0];
           const fromValue = (v0 && (v0.resultParameter ?? v0.ResultParameter ?? v0)) ?? null;
           const arrFromValue = extractArrayFromAny(fromValue);
           if (arrFromValue.length) return arrFromValue;
         }
-
-        // 2) FileMaker ScriptResult : { scriptResult: { resultParameter: "..." } }
         if (any.scriptResult) {
           const cand = any.scriptResult.resultParameter ?? any.scriptResult.ResultParameter ?? null;
           if (cand) {
@@ -222,15 +241,11 @@
             if (got.length) return got;
           }
         }
-
-        // 3) Cas général : resultParameter à la racine
         const directCand = any.resultParameter ?? any.ResultParameter ?? any.result ?? any.data ?? any.raw ?? null;
         if (directCand) {
           const got = extractArrayFromAny(directCand);
           if (got.length) return got;
         }
-
-        // 4) Exploration récursive de toutes les valeurs de l'objet (pour attraper des clés inattendues)
         for (const v of Object.values(any)) {
           const got = extractArrayFromAny(v);
           if (got.length) return got;
@@ -238,15 +253,11 @@
         return [];
       }
 
-      // Cas string
       if (typeof any === 'string') {
-        // si la string elle-même est un JSON valide
         try {
           const parsed = JSON.parse(any);
           return extractArrayFromAny(parsed);
         } catch (_) {}
-
-        // sinon, on isole le premier [ ... ] équilibré
         const start = any.indexOf('[');
         const end = any.lastIndexOf(']');
         if (start !== -1 && end !== -1 && end > start) {
@@ -257,7 +268,7 @@
       return [];
     }
 
-    // Affiche un aperçu brut de la réponse et le premier id détecté
+    // Show a small raw preview and first id (hidden unless toggled)
     function showDebugRaw(rawText, payload) {
       const head = rawText.slice(0, 600);
       let firstId = '(aucun)';
@@ -275,11 +286,10 @@ ${head}
 [DEBUG] typeof payload: ${typeof payload}
 [DEBUG] clés payload: ${payload && typeof payload === 'object' ? Object.keys(payload).join(', ') : '(n/a)'}
 [DEBUG] Premier id détecté: ${firstId}`;
-      if (toggleRaw && !toggleRaw.checked) { /* keep text updated but hidden */ }
     }
 
     function normalizeRow(r){
-      const steriliseeRaw = r['sterilisée'] ?? r['stérilisée'] ?? r.sterilisee ?? r.sterilisee ?? r.sterilized ?? '';
+      const steriliseeRaw = r['sterilisée'] ?? r['stérilisée'] ?? r.sterilisee ?? r.sterilized ?? '';
       const dateN = r['date naissance'] ?? r.date_naissance ?? r.dateNaissance ?? r.birth_date ?? '';
       const birthParsed = parseEuDate(dateN);
       const age = ageFromDate(birthParsed);
@@ -296,6 +306,16 @@ ${head}
       };
     }
 
+    function getTotalPages(total){ return Math.max(1, Math.ceil(total / pageSize)); }
+    function updatePager(total){
+      const totalPages = getTotalPages(total);
+      const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+      const end = Math.min(currentPage * pageSize, total);
+      pageInfoEl.textContent = `${start}–${end} / ${total}`;
+      prevPageBtn.disabled = currentPage <= 1;
+      nextPageBtn.disabled = currentPage >= totalPages;
+    }
+
     function renderTable(rows){
       const headers = [
         { key:'nom', label:'Nom' },
@@ -307,13 +327,22 @@ ${head}
         { key:'date_naissance', label:'Date naissance', class:'nowrap col-date' },
       ];
 
+      const total = rows.length;
+      const totalPages = getTotalPages(total);
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const startIdx = (currentPage - 1) * pageSize;
+      const endIdx = Math.min(startIdx + pageSize, total);
+      const pageRows = rows.slice(startIdx, endIdx);
+
       const ths = headers.map(h => {
         const dir = (sortState.key === h.key) ? (sortState.dir === 'asc' ? ' ▲' : ' ▼') : '';
         const cls = 'sortable' + (h.class ? ' ' + h.class : '');
         return `<th data-key="${h.key}" class="${cls}">${h.label}${dir}</th>`;
       }).join('');
 
-      let trs = rows.map(r => `
+      let trs = pageRows.map(r => `
         <tr>
           <td>${escapeHtml(r.nom)}</td>
           <td class="col-espece">${escapeHtml(r.espece)}</td>
@@ -335,7 +364,6 @@ ${head}
         </table>
       `;
 
-      // tri
       tableWrap.querySelectorAll('th.sortable').forEach(th => {
         th.addEventListener('click', () => {
           const key = th.getAttribute('data-key');
@@ -344,11 +372,15 @@ ${head}
           } else {
             sortState.key = key; sortState.dir = 'asc';
           }
+          currentPage = 1;
           applySort(); renderTable(viewRows);
         });
       });
 
-      countEl.textContent = `${rows.length} élément${rows.length>1?'s':''}`;
+      updatePager(total);
+      const startDisp = total === 0 ? 0 : (startIdx + 1);
+      const endDisp = endIdx;
+      countEl.textContent = `${startDisp}–${endDisp} sur ${total} élément${total>1?'s':''}`;
     }
 
     function applySort(){
@@ -372,28 +404,24 @@ ${head}
 
     function applyFilters(){
       const qGlob = globalSearch.value.trim().toLowerCase();
-
       viewRows = rawRows.filter(r => {
         if (!qGlob) return true;
         const s = `${r.nom} ${r.espece} ${r.race} ${r.sterilisee} ${r.date_naissance} ${r.age_label} ${r.poids ?? ''}`.toLowerCase();
         return s.includes(qGlob);
       });
-
+      currentPage = 1;
       applySort();
       renderTable(viewRows);
     }
 
-    // parse spécifiquement scriptResult.resultParameter (souvent une string JSON avec \r etc.)
     function parseResultParam(str) {
       if (str == null) return [];
       if (Array.isArray(str)) return str;
       if (typeof str !== 'string') return extractArrayFromAny(str);
-      // 1) tentative JSON.parse directe
       try { 
         const v = JSON.parse(str);
         return Array.isArray(v) ? v : extractArrayFromAny(v);
       } catch(_) {}
-      // 2) isole la première séquence [ ... ] et parse
       const start = str.indexOf('[');
       const end = str.lastIndexOf(']');
       if (start !== -1 && end !== -1 && end > start) {
@@ -415,23 +443,18 @@ ${head}
 
       try {
         setLoading(true);
-
-        // On lit TOUJOURS en texte puis on essaie de parser JSON (robuste aux content-types exotiques)
         const resp = await fetch('/api/filemaker', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-         // body: JSON.stringify({ scriptParameterValue: query })
-         body: JSON.stringify({ query })
+          body: JSON.stringify({ query })
         });
         const rawText = await resp.text();
 
         let payload;
         try { payload = JSON.parse(rawText); } catch { payload = { raw: rawText }; }
 
-        // Affiche un aperçu de la réponse brute et tente d'extraire un id
         showDebugRaw(rawText, payload);
 
-        // Fast-path pour FileMaker: parse directement scriptResult.resultParameter si présent
         let fastRows = [];
         if (payload && payload.scriptResult && (payload.scriptResult.resultParameter || payload.scriptResult.ResultParameter)) {
           const rp = payload.scriptResult.resultParameter ?? payload.scriptResult.ResultParameter;
@@ -443,7 +466,6 @@ ${head}
           return;
         }
 
-        // -> extraction robuste (préfère le fast-path)
         let arr = [];
         if (Array.isArray(fastRows) && fastRows.length) {
           arr = fastRows;
@@ -456,11 +478,12 @@ ${head}
         if (!viewRows.length) {
           showMsg('Réponse reçue mais aucune ligne parsée. Vérifie le schéma (resultParameter / OData value).', 'err');
           applySort();
-          renderTable(viewRows); // affiche quand même l’en-tête et la ligne “Aucune donnée”
+          renderTable(viewRows);
           return;
         }
 
         showMsg(`Réponse reçue ✔︎ (${viewRows.length} lignes)`, 'ok');
+        currentPage = 1;
         applySort();
         renderTable(viewRows);
       } catch (err) {
