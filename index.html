@@ -9,7 +9,20 @@
     * { box-sizing: border-box; }
     body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     .wrap { max-width:1100px; margin:40px auto; padding:0 16px; }
-    header { margin-bottom:16px; }
+    header { margin-bottom:16px; position:relative; }
+    .settings-btn {
+      position:absolute; top:0; right:0;
+      border:1px solid var(--border); background:#fff; border-radius:10px;
+      padding:8px 10px; cursor:pointer; font-size:14px;
+      box-shadow:0 2px 6px rgba(0,0,0,.05);
+    }
+    .settings-menu {
+      position:absolute; top:42px; right:0; background:#fff; border:1px solid var(--border);
+      border-radius:12px; padding:12px; min-width:220px; box-shadow:0 8px 24px rgba(0,0,0,.08); display:none;
+      z-index:10;
+    }
+    .settings-menu label { display:flex; gap:8px; align-items:center; font-size:14px; color:var(--fg); }
+    .settings-menu .muted { margin-top:6px; }
     h1 { margin:0 0 8px; font-weight:700; font-size:22px; }
     p.lead { margin:0; color:var(--muted); }
     .bar { display:flex; gap:8px; margin:16px 0 0; }
@@ -62,6 +75,11 @@
     <header>
       <h1>🤖 Digimidi Query Builder</h1>
       <p class="lead">Le navigateur appelle <code>/api/filemaker</code> (proxy serveur). Données affichées en tableau triable & filtrable.</p>
+      <button id="settingsBtn" class="settings-btn" title="Paramètres">⚙️</button>
+      <div id="settingsMenu" class="settings-menu">
+        <label><input type="checkbox" id="toggleRaw"> Afficher la réponse brute</label>
+        <div class="muted">Masqué par défaut. Utile pour le debug.</div>
+      </div>
       <div class="bar">
         <input id="q" class="query" placeholder="Ex. : dogs > 50 kg not sterilized" />
         <button id="go" class="go" onclick="processQuery()">Rechercher</button>
@@ -72,22 +90,14 @@
     <section class="card">
       <div id="status" class="muted">Prêt.</div>
       <div id="messages"></div>
-      <div id="debug" class="muted" style="white-space:pre-wrap; margin-top:8px;"></div>
+      <div id="debug" class="muted" style="white-space:pre-wrap; margin-top:8px; display:none;"></div>
 
       <div class="toolbar">
         <input id="globalSearch" class="search" placeholder="🔎 Recherche globale (nom, race, espèce…)" />
         <div class="count" id="count">0 élément</div>
       </div>
 
-      <div class="filters">
-        <input class="filter" data-key="nom" placeholder="Filtrer: nom" />
-        <input class="filter" data-key="espece" placeholder="Filtrer: espèce" />
-        <input class="filter" data-key="race" placeholder="Filtrer: race" />
-        <input class="filter" data-key="poids" placeholder="Filtrer: poids (ex: >50)" />
-        <input class="filter" data-key="sterilisee" placeholder="Filtrer: stérilisée (OUI/NON)" />
-        <input class="filter" data-key="date_naissance" placeholder="Filtrer: date naissance" />
-        <input class="filter" data-key="id" placeholder="Filtrer: id" />
-      </div>
+
 
       <div id="tableWrap" class="table-scroll"></div>
     </section>
@@ -101,16 +111,36 @@
     const tableWrap = document.getElementById('tableWrap');
     const countEl = document.getElementById('count');
     const globalSearch = document.getElementById('globalSearch');
-    const filterInputs = Array.from(document.querySelectorAll('.filter'));
     const debugEl = document.getElementById('debug');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsMenu = document.getElementById('settingsMenu');
+    const toggleRaw = document.getElementById('toggleRaw');
 
     let rawRows = [];
     let viewRows = [];
     let sortState = { key: 'poids', dir: 'asc' };
 
+    // ---- Settings (show/hide raw debug) ----
+    function setDebugVisible(v){
+      localStorage.setItem('showRaw', v ? '1' : '0');
+      toggleRaw.checked = !!v;
+      debugEl.style.display = v ? 'block' : 'none';
+    }
+    // initial state
+    setDebugVisible(localStorage.getItem('showRaw') === '1');
+
+    settingsBtn.addEventListener('click', () => {
+      settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+    });
+    document.addEventListener('click', (e) => {
+      if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+        settingsMenu.style.display = 'none';
+      }
+    });
+    toggleRaw.addEventListener('change', (e) => setDebugVisible(e.target.checked));
+
     q.addEventListener('keydown', e => { if (e.key === 'Enter') processQuery(); });
     globalSearch.addEventListener('input', applyFilters);
-    filterInputs.forEach(inp => inp.addEventListener('input', applyFilters));
 
     function setLoading(isLoading) {
       go.disabled = isLoading;
@@ -203,6 +233,7 @@ ${head}
 [DEBUG] typeof payload: ${typeof payload}
 [DEBUG] clés payload: ${payload && typeof payload === 'object' ? Object.keys(payload).join(', ') : '(n/a)'}
 [DEBUG] Premier id détecté: ${firstId}`;
+      if (toggleRaw && !toggleRaw.checked) { /* keep text updated but hidden */ }
     }
 
     function normalizeRow(r){
@@ -288,41 +319,13 @@ ${head}
       });
     }
 
-    function matchFilter(row, key, val){
-      if (!val) return true;
-      val = val.trim(); if (!val) return true;
-
-      if (key === 'poids') {
-        const m = val.match(/^(>=|<=|>|<|=)\s*([\d.,]+)$/);
-        if (m) {
-          const op = m[1], num = Number(m[2].replace(',','.'));
-          const v = Number(row.poids ?? NaN);
-          if (Number.isNaN(v)) return false;
-          return op === '>' ? v > num :
-                 op === '>=' ? v >= num :
-                 op === '<' ? v < num :
-                 op === '<=' ? v <= num :
-                 v === num;
-        }
-      }
-
-      const hay = String(row[key] ?? '').toLowerCase();
-      return hay.includes(val.toLowerCase());
-    }
-
     function applyFilters(){
       const qGlob = globalSearch.value.trim().toLowerCase();
-      const perCol = Object.fromEntries(filterInputs.map(i => [i.dataset.key, i.value || '']));
 
       viewRows = rawRows.filter(r => {
-        if (qGlob) {
-          const s = `${r.nom} ${r.espece} ${r.race} ${r.sterilisee} ${r.date_naissance} ${r.id}`.toLowerCase();
-          if (!s.includes(qGlob)) return false;
-        }
-        for (const [k,v] of Object.entries(perCol)) {
-          if (!matchFilter(r, k, v)) return false;
-        }
-        return true;
+        if (!qGlob) return true;
+        const s = `${r.nom} ${r.espece} ${r.race} ${r.sterilisee} ${r.date_naissance} ${r.id} ${r.poids ?? ''}`.toLowerCase();
+        return s.includes(qGlob);
       });
 
       applySort();
