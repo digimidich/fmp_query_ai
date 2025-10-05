@@ -128,6 +128,9 @@
     const nextPageBtn = document.getElementById('nextPage');
     const pageInfoEl = document.getElementById('pageInfo');
 
+    // Ensure pageSize matches the current <select> value on load
+    pageSize = parseInt(pageSizeSel.value, 10) || 10;
+
     let rawRows = [];
     let viewRows = [];
     let sortState = { key: 'poids', dir: 'asc' };
@@ -322,13 +325,14 @@ ${head}
         { key:'espece', label:'Espèce', class:'col-espece' },
         { key:'race', label:'Race' },
         { key:'poids', label:'Poids (kg)', class:'nowrap' },
-        { key:'age', label:'Âge' },
+        { key:'age_months', label:'Âge' },
         { key:'sterilisee', label:'Stérilisée' },
         { key:'date_naissance', label:'Date naissance', class:'nowrap col-date' },
       ];
 
       const total = rows.length;
       const totalPages = getTotalPages(total);
+      updatePager(total);
       if (currentPage > totalPages) currentPage = totalPages;
       if (currentPage < 1) currentPage = 1;
 
@@ -392,7 +396,7 @@ ${head}
           const bv = b.poids ?? -Infinity;
           return dir === 'asc' ? (av - bv) : (bv - av);
         }
-        if (key === 'age') {
+        if (key === 'age_months') {
           const av = (a.age_months ?? -Infinity);
           const bv = (b.age_months ?? -Infinity);
           return dir === 'asc' ? (av - bv) : (bv - av);
