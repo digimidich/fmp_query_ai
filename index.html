@@ -369,7 +369,8 @@ ${head}
         const resp = await fetch('/api/filemaker', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scriptParameterValue: query })
+         // body: JSON.stringify({ scriptParameterValue: query })
+         body: JSON.stringify({ query })
         });
         const rawText = await resp.text();
 
