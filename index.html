@@ -128,8 +128,8 @@
     const nextPageBtn = document.getElementById('nextPage');
     const pageInfoEl = document.getElementById('pageInfo');
 
-    let rawRows = [];
-    let viewRows = [];
+    var rawRows = [];
+    var viewRows = [];
     let sortState = { key: 'poids', dir: 'asc' };
     /* Pagination */
     let pageSize = parseInt(pageSizeSel.value, 10) || 10; // initialize after selecting the element
@@ -405,7 +405,8 @@ ${head}
 
     function applyFilters(){
       const qGlob = globalSearch.value.trim().toLowerCase();
-      viewRows = rawRows.filter(r => {
+      const base = Array.isArray(rawRows) ? rawRows : [];
+      viewRows = base.filter(r => {
         if (!qGlob) return true;
         const s = `${r.nom} ${r.espece} ${r.race} ${r.sterilisee} ${r.date_naissance} ${r.age_label} ${r.poids ?? ''}`.toLowerCase();
         return s.includes(qGlob);
