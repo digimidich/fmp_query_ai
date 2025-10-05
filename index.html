@@ -195,6 +195,8 @@
     }
     function showError(msg){ showMsg(msg, 'err'); }
     function escapeHtml(str){ return (str??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function toUpperFR(v){ return String(v ?? '').toLocaleUpperCase('fr-FR'); }
+    function escapeHtmlUpper(str){ return escapeHtml(toUpperFR(str)); }
 
     // Parse European dates like dd.MM.yyyy or dd/MM/yyyy, also accept ISO yyyy-MM-dd
     function parseEuDate(input) {
@@ -357,13 +359,13 @@ ${head}
 
       let trs = pageRows.map(r => `
         <tr>
-          <td>${escapeHtml(r.nom)}</td>
-          <td class="col-espece">${escapeHtml(r.espece)}</td>
-          <td>${escapeHtml(r.race)}</td>
+          <td>${escapeHtmlUpper(r.nom)}</td>
+          <td class="col-espece">${escapeHtmlUpper(r.espece)}</td>
+          <td>${escapeHtmlUpper(r.race)}</td>
           <td class="nowrap">${r.poids ?? ''}</td>
-          <td>${escapeHtml(r.age_label)}</td>
-          <td>${escapeHtml(r.sterilisee)}</td>
-          <td class="nowrap col-date">${escapeHtml(r.date_naissance)}</td>
+          <td>${escapeHtmlUpper(r.age_label)}</td>
+          <td>${escapeHtmlUpper(r.sterilisee)}</td>
+          <td class="nowrap col-date">${escapeHtmlUpper(r.date_naissance)}</td>
         </tr>
       `).join('');
       if (!trs) {
